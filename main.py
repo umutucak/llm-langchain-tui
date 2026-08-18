@@ -99,12 +99,8 @@ while True:
                         thinking_gate = False
                     print(delta.get("text", ""), end="", flush=True)
         print("\n")
-
         # check if tool were used, if so, print what tool and its result
-        # tool_print(stream)
-        # ai response
-        # result["messages"][-1].pretty_print()
+        tool_print(stream.output)
     except KeyboardInterrupt:
         print("\nctrl+c caught. terminating.")
         break
-
