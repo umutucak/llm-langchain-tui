@@ -1,5 +1,6 @@
 import json
 import os
+import warnings
 
 from dotenv import load_dotenv
 
@@ -33,20 +34,36 @@ agent_thread_config = {
     }
 }
 
+# announces that its beta, so we shush it
+warnings.filterwarnings(
+    "ignore", 
+    message=".*v3 streaming protocol on Pregel is experimental.*"
+)
+
 messages = []
 print("Type 'quit' to exit the loop.")
 while True:
-    # user prompt
-    user_input: str = input(" > Input: ")
-    if user_input == "quit":
-        print("Ending loop.")
+    try:
+        # user prompt
+        user_input: str = input(" > Input: ")
+        if user_input == "quit":
+            print("Ending loop.")
+            break
+
+        messages.append(HumanMessage(user_input))
+        stream = agent.stream_events({"messages": messages}, config=agent_thread_config, version="v3")
+
+        print("=== Assistant Response ===")
+        for message in stream.messages:
+            for delta in message.text:
+                print(delta, end="", flush=True)
+        print("\n")
+
+        # check if tool were used, if so, print what tool and its result
+        # tool_print(stream)
+        # ai response
+        # result["messages"][-1].pretty_print()
+    except KeyboardInterrupt:
+        print("\nctrl+c caught. terminating.")
         break
-
-    messages.append(HumanMessage(user_input))
-    result = agent.invoke({"messages": messages}, config=agent_thread_config)
-
-    # check if tool were used, if so, print what tool and its result
-    tool_print(result)
-    # ai response
-    result["messages"][-1].pretty_print()
 
