@@ -30,7 +30,11 @@ def _eval(node):
 
 @tool
 def calculator(expression: str) -> str:
-    """Safely evaluate a basic arithmetic expression, returning the result as text."""
+    """Evaluate a basic arithmetic expression and return the numeric
+    result. Supports + - * / // % ** and parentheses. Use this for any 
+    arithmetic instead of computing it yourself.
+    """
+
     try:
         tree = ast.parse(expression, mode="eval")
         return str(_eval(tree.body))

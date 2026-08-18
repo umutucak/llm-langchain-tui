@@ -16,12 +16,12 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 import sqlite3
 
 from tools.tools_registrar import TOOLS
-from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session
+from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session, stream_output
 
 load_dotenv()
 MODEL: str = os.getenv("MODEL")
 SYSTEM_PROMPT: str = os.getenv("SYSTEM_PROMPT")
-DISPLAY_THINKING: bool = bool(int(os.getenv("DISPLAY_THINKING")))
+MAX_TOOL_CALLS: int = 3
 IS_REASONING: bool = bool(int(os.getenv("IS_REASONING")))
 TEMPERATURE: float = float(os.getenv("TEMPERATURE"))
 TOP_K: float = float(os.getenv("TOP_K"))
@@ -78,16 +78,17 @@ warnings.filterwarnings(
 )
 
 
-print("Type 'quit' to exit the loop. Several / commands are available (/help to see).")
+print("Control+C to exit the loop. Several / commands are available (/help to see).")
 while True:
     try:
         # user prompt
         user_input: str = input(" > Input: ")
+        skip_loop: bool = False
+        # empty input
         if user_input.strip() == "":
             continue
-        elif user_input == "quit":
-            print("Ending loop.")
-            break
+        # slash commands
+        # big ass ugly ass switch case, look away before it turns you to stone
         elif user_input.strip()[0] == '/':
             match user_input[1:]:
                 case "help":
@@ -99,79 +100,57 @@ while True:
                     session_title = input(" > Enter the title of the session: ")
                     set_session_title(sqlite_connection, agent_thread_config["configurable"]["thread_id"], session_title)
                 case "list":
-                    for thread_id, title, updated_at in list_sessions(sqlite_connection):
-                        print(f"{title or '(untitled)'}  [{thread_id}]  updated {updated_at}")
+                    sessions = list_sessions(sqlite_connection)
+                    for i, (thread_id, title, updated_at) in enumerate(sessions, start=1):
+                        if thread_id == agent_thread_config["configurable"]["thread_id"]:
+                            print("[CURRENT] ", end="")
+                        print(f"{i}. {title or '(untitled)'}  updated {updated_at}")
                 case "load":
                     sessions = list_sessions(sqlite_connection)
                     for i, (thread_id, title, updated_at) in enumerate(sessions, start=1):
+                        if thread_id == agent_thread_config["configurable"]["thread_id"]:
+                            print("[CURRENT] ", end="")
                         print(f"{i}. {title or '(untitled)'}  updated {updated_at}")
                     selected = int(input(" > Enter index of session to resume: ")) - 1
                     agent_thread_config["configurable"]["thread_id"] = sessions[selected][0]
                 case "delete":
                     sessions = list_sessions(sqlite_connection)
+                    current_idx: int = 0
                     for i, (thread_id, title, updated_at) in enumerate(sessions, start=1):
                         # skip current one
                         if thread_id == agent_thread_config["configurable"]["thread_id"]:
-                            continue
+                            current_idx = i
+                            print("[CURRENT] ", end="")
                         print(f"{i}. {title or '(untitled)'}  updated {updated_at}")
-                    selected = int(input(" > Enter index of session to delete: ")) - 1
-                    confirm = input("Confirm session deletion by typing YES: ")
-                    if confirm == "YES":
-                        delete_session(sqlite_connection, sessions[selected][0])
-                        print("Delete successful.")
-                    else:
-                        print("Delete not confirmed.\n")
+                    selected = input(" > Enter indices of sessions to delete separated with white space (1 2 4): ")
+                    for i in selected.strip().split(' '):
+                        idx = i.strip()
+                        if idx.isnumeric() and int(idx) > 0 and int(idx) <= len(sessions) and int(idx) != current_idx:
+                            idx = int(idx)-1
+                            # commenting this out for now for testing... surely i wont forget and then get confused
+                            # confirm = input("Confirm session deletion by typing YES: ")
+                            confirm = "YES"
+                            if confirm == "YES":
+                                delete_session(sqlite_connection, sessions[idx][0])
+                                print("Delete successful.")
+                            else:
+                                print("Delete not confirmed.\n")
                 case _:
                     print(f"{user_input[1:]} unrecognized. Try /help to see available commands.")
             continue
-            
+
+        
+        # prompt chatbot
         stream = agent.stream_events({"messages": [HumanMessage(user_input)]}, config=agent_thread_config, version="v3")
 
         print("=== Assistant Response ===")
-        for message in stream.messages:
-            thinking_gate = False
-            for event in message:
-                # check if event is streamed data, and check if streamed delta has data
-                delta = event.get("delta")
-                if event.get("event") != "content-block-delta" or not isinstance(delta, dict):
-                    continue
-                # reasoning stream
-                if delta.get("type") == "reasoning-delta" and DISPLAY_THINKING:
-                    if not thinking_gate:
-                        print("<THINKING>", end="", flush=True)
-                        thinking_gate = True
-                    print(delta.get("reasoning", ""), end="", flush=True)
-                # output stream
-                elif delta.get("type") == "text-delta":
-                    if thinking_gate:
-                        print("</THINKING>\n", flush=True)
-                        thinking_gate = False
-                    print(delta.get("text", ""), end="", flush=True)
-        print("\n")
-        # check if tool were used, if so, print what tool and its result
-        print_tool_use(stream.output)
-        # self-name the session
+        stream_output(stream)
+        # self-name the session if not already named
         if not is_session_named(sqlite_connection, agent_thread_config["configurable"]["thread_id"]):
+            print("Watch for slight freeze, naming conversation...")
             self_naming_prompt = strip_tool_context(agent.get_state(agent_thread_config).values["messages"])
-            p = """**You are a conversation-naming engine.** Given the first user message and the first assistant reply in a conversation, produce a short, human-friendly title (2-7 words) that a user would use to *find this conversation again* in a sidebar or history list.
-                **Rules:**
-                - Write it as a noun phrase or short label, not a sentence. No "How to…", "Question about…", or "The user asks…".
-                - Capture the **user's intent or the subject matter**, not the mechanics of the exchange.
-                - Be specific enough to distinguish from similar conversations, but general enough that it still fits if the chat meanders a bit.
-                - Title Case. No punctuation at the end. No quotes.
-                - If the topic is a task (e.g., debugging, writing a poem, planning a trip), name the *object of the task* ("Debugging React Hydration Error," "Trip Itinerary - Lisbon in June"), not the verb of help-seeking.
-                - Avoid filler like "Chat about…", "Discussion on…", "Inquiry regarding…".
-                - If the first exchange is ambiguous or very short, lean on the user's framing.
-
-                **Examples of good titles:**
-                - User: "Why is my Python script printing `None` instead of the list?" / Assistant explains the in-place mutation. → **None vs. List - Python Mutation Bug**
-                - User: "Can you write a haiku about my cat knocking things off shelves?" / Assistant writes one. → **Cat Shelf-Knocker Haiku**
-                - User: "I need a 3-week itinerary for Japan in October" / Assistant outlines days. → **Japan - October, 3 Weeks**
-                - User: "Explain CRISPR like I'm 12" / Assistant does. → **CRISPR, Explained Simply**
-                - User: "Help me name my bakery" / Assistant brainstorms. → **Bakery Name Brainstorm**
-
-                **Now generate the title for this conversation:**
-            """
+            with open("self_name_prompt.txt", 'r') as f:
+                p = f.read()
             self_naming_prompt.append(HumanMessage(p))
             set_session_title(
                 sqlite_connection,
