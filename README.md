@@ -1,4 +1,4 @@
-Langchain practice with self-hosted model through ollama using python3.12
+Langchain practice with self-hosted model through ollama using `python3.12.13`
 
 Most constants and hyperparameters are defined in `.env`.
 
