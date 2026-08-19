@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from langchain_core.utils.uuid import uuid7
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 from langchain.messages import HumanMessage
 
 from langchain_ollama.chat_models import ChatOllama
@@ -17,7 +18,7 @@ from langgraph.stream.run_stream import GraphRunStream
 import sqlite3
 
 from tools.tools_registrar import TOOLS
-from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session, stream_output
+from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session, stream_output, on_search_error
 
 load_dotenv()
 MODEL: str = os.getenv("MODEL")
@@ -25,7 +26,8 @@ SQLITE_DB_PATH=os.getenv("SQLITE_DB_PATH")
 with open(os.getenv("SYSTEM_PROMPT_PATH"), 'r') as f:
     SYSTEM_PROMPT: str = f.read()
 CONTEXT_SIZE: int = int(os.getenv("CONTEXT_SIZE"))
-MAX_TOOL_CALLS: int = 3
+# searches allowed per user turn
+MAX_TOOL_CALLS: int = int(os.getenv("MAX_TOOL_CALLS"))
 IS_REASONING: bool = bool(int(os.getenv("IS_REASONING")))
 TEMPERATURE: float = float(os.getenv("TEMPERATURE"))
 TOP_K: int = int(os.getenv("TOP_K"))
@@ -64,8 +66,18 @@ memory.setup()
 agent: CompiledStateGraph = create_agent(
     model=model,
     tools=TOOLS,
+    middleware=[
+        ToolCallLimitMiddleware(
+            tool_name="search_books",
+            run_limit=MAX_TOOL_CALLS
+        ),
+        ToolErrorMiddleware(
+            on_error=on_search_error,
+            tools=["search_books"]
+        )
+    ],
     system_prompt=SYSTEM_PROMPT,
-    checkpointer=memory
+    checkpointer=memory,
 )
 
 agent_thread_config = {
