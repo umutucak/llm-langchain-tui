@@ -18,7 +18,8 @@ from langgraph.stream.run_stream import GraphRunStream
 import sqlite3
 
 from tools.tools_registrar import TOOLS
-from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session, stream_output, on_search_error
+from util import print_tool_use, set_session_title, list_sessions, is_session_named, strip_tool_context, delete_session, stream_output
+from middleware import on_search_error, repair_tool_calls
 
 load_dotenv()
 MODEL: str = os.getenv("MODEL")
@@ -74,7 +75,11 @@ agent: CompiledStateGraph = create_agent(
         ToolErrorMiddleware(
             on_error=on_search_error,
             tools=["search_books"]
-        )
+        ),
+        # after_model custom middleware to fix malformed tool calls
+        # https://docs.langchain.com/oss/python/langchain/middleware/custom#node-style-hooks
+        # i am so proud of this one
+        repair_tool_calls
     ],
     system_prompt=SYSTEM_PROMPT,
     checkpointer=memory,
