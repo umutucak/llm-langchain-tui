@@ -22,7 +22,8 @@ from util import print_tool_use, set_session_title, list_sessions, is_session_na
 load_dotenv()
 MODEL: str = os.getenv("MODEL")
 SQLITE_DB_PATH=os.getenv("SQLITE_DB_PATH")
-SYSTEM_PROMPT: str = os.getenv("SYSTEM_PROMPT")
+with open(os.getenv("SYSTEM_PROMPT_PATH"), 'r') as f:
+    SYSTEM_PROMPT: str = f.read()
 CONTEXT_SIZE: int = int(os.getenv("CONTEXT_SIZE"))
 MAX_TOOL_CALLS: int = 3
 IS_REASONING: bool = bool(int(os.getenv("IS_REASONING")))
@@ -85,7 +86,6 @@ while True:
     try:
         # user prompt
         user_input: str = input(" > Input: ")
-        skip_loop: bool = False
         # empty input
         if user_input.strip() == "":
             continue

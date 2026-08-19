@@ -1,5 +1,4 @@
 import os
-import difflib
 
 from dotenv import load_dotenv
 
