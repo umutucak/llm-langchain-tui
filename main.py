@@ -12,6 +12,7 @@ from langchain_ollama.chat_models import ChatOllama
 
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.stream.run_stream import GraphRunStream
 
 import sqlite3
 
@@ -20,31 +21,32 @@ from util import print_tool_use, set_session_title, list_sessions, is_session_na
 
 load_dotenv()
 MODEL: str = os.getenv("MODEL")
+SQLITE_DB_PATH=os.getenv("SQLITE_DB_PATH")
 SYSTEM_PROMPT: str = os.getenv("SYSTEM_PROMPT")
+CONTEXT_SIZE: int = int(os.getenv("CONTEXT_SIZE"))
 MAX_TOOL_CALLS: int = 3
 IS_REASONING: bool = bool(int(os.getenv("IS_REASONING")))
 TEMPERATURE: float = float(os.getenv("TEMPERATURE"))
-TOP_K: float = float(os.getenv("TOP_K"))
+TOP_K: int = int(os.getenv("TOP_K"))
 TOP_P: float = float(os.getenv("TOP_P"))
-MIN_P: float = float(os.getenv("MIN_P"))
 REPETITION_PENALTY: float = float(os.getenv("REPETITION_PENALTY"))
-# PRESENCE_PENALTY: float = float(os.getenv("PRESENCE_PENALTY")) # not exposed through ChatOllama?
 
 
 # values from .env, which are the recommended values from
 # https://huggingface.co/Qwen/Qwen3.8-27B
+# ctx extended according to my 3090 with q8 kv caching
 model = ChatOllama(
     model=MODEL,
     reasoning=IS_REASONING,
+    num_ctx=CONTEXT_SIZE,
     temperature=TEMPERATURE,
     validate_model_on_init=True,
     top_p=TOP_P,
     top_k=TOP_K,
-    min_p=MIN_P,
     repeat_penalty=REPETITION_PENALTY
 )
 
-sqlite_connection = sqlite3.connect("checkpoints.sqlite", check_same_thread=False)
+sqlite_connection = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
 sqlite_connection.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
         thread_id TEXT PRIMARY KEY,
@@ -141,7 +143,11 @@ while True:
 
         
         # prompt chatbot
-        stream = agent.stream_events({"messages": [HumanMessage(user_input)]}, config=agent_thread_config, version="v3")
+        # HumanMessage returns dict with keys "role" and "content" which are "user" and their input string, respectively.
+        # you then put the HumanMessage in a list, as stream_events takes list as arg
+        # only current message can be sent and not the full context,
+        # the agent already has the context inside agent.get_state(agent_thread_config)
+        stream: GraphRunStream = agent.stream_events({"messages": [HumanMessage(user_input)]}, config=agent_thread_config, version="v3")
 
         print("=== Assistant Response ===")
         stream_output(stream)

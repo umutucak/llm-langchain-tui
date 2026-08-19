@@ -5,13 +5,19 @@ from dotenv import load_dotenv
 from langchain.messages import AIMessage, ToolMessage
 from langchain_core.messages.base import BaseMessage
 
+from langgraph.stream.run_stream import GraphRunStream
+
 
 load_dotenv()
 MAX_TOOL_CALLS: int = 3
 DISPLAY_THINKING: bool = bool(int(os.getenv("DISPLAY_THINKING")))
 
 
-def stream_output(stream):
+def stream_output(stream:GraphRunStream):
+    # guide i read to write this abomination:
+    # https://docs.langchain.com/oss/python/deepagents/event-streaming#stream-messages
+    
+    # message type = ChatModelStream
     for message in stream.messages:
         thinking_gate = False
         for event in message:
@@ -31,6 +37,10 @@ def stream_output(stream):
                     print("</THINKING>\n", flush=True)
                     thinking_gate = False
                 print(delta.get("text", ""), end="", flush=True)
+        # a tool-calling turn ends on the tool call, with no text delta to
+        # close the block, so it has to be closed out here instead
+        if thinking_gate:
+            print("</THINKING>\n", flush=True)
     print("\n")
     # check if tool were used, if so, print what tool and its result
     print_tool_use(stream.output)
@@ -61,20 +71,31 @@ def delete_session(sqlite_connection, thread_id: str) -> None:
 
 
 def strip_tool_context(messages: list[BaseMessage]) -> list[BaseMessage]:
-    """Strip full context from tool calls.
+    """Used to extract only the input and output messages. Strips reasoning and tool blocks.
 
-    Used for cleaning up the first exchange for feeding it
-    back into the model to self-name the session.
+    Args:
+    full context: list[BaseMessage]
+
+    Return:
+    only output and input messages: list[BaseMessage]
     """
 
     cleaned = []
     for m in messages:
+        # ignore tool outputs
         if isinstance(m, ToolMessage):
             continue
-        if isinstance(m, AIMessage) and m.tool_calls:
-            cleaned.append(AIMessage(content=m.content))
+        # rid AI output from its reasoning and tool call blocks
+        if isinstance(m, AIMessage):
+            # holy list comp that extracts only the text output from the AIMessage
+            text: str = "\n".join([block.get("text") for block in m.content if block.get("type") == "text"])
+            if not text.strip():
+                continue
+            cleaned.append(AIMessage(content=text))
+        # user input can be processed directly
         else:
-            cleaned.append(m)
+            cleaned.append(m.content)
+
     return cleaned
 
 
