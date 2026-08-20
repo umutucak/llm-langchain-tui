@@ -1,0 +1,1 @@
+Can you confirm if the agent is spitting out coupled/malformed requests. if so, are they successfully being repaired? for case 5, is the agent informed about which tool use did not get piped through?
