@@ -1,0 +1,1 @@
+I changed my mind, this is fine. Is it ready to run? After running, it will populate a milvus.db file with the vector embeddings, confirm?
