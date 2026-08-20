@@ -1,0 +1,3 @@
+Few things:
+1) I rewrote your comment so i can udnerstand it again later
+2) the repair attempt count gate does not report to the agent that some tool calls were blocked, it only pipes them to the tool node. it prints a general error, but i want the agent to know that a specific tool call didnt make it through
