@@ -1,0 +1,1 @@
+1a 2a 3a 4a 5a 6a 7b and 7c. for 7, i wanna see the context window, and the run-time stats of tokens/sec. rest of the mock-up looks great and complete. Process my preferences, do one more pass over the design based on these choices, then start implementation.
