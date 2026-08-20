@@ -1,0 +1,1 @@
+i want to remove hardcoded pdf dir from ingest.py and instead pass via script parameter
