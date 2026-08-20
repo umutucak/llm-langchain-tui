@@ -1,0 +1,1 @@
+Alright, got it. I will now clean the project and commit/push the rag stack to github, then we will start working on context management to get an optimised 50k context window.
