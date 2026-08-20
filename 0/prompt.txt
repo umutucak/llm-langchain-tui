@@ -1,0 +1,1 @@
+Expose the context to me in a verbose but readable format. I want to inspect the context myself
