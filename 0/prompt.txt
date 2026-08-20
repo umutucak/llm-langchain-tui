@@ -1,0 +1,1 @@
+This was a lot, and mostly API related. Write up a report that talks about the problem at a low-level implementation level. I want to understand what the problem was, why and how you fixed it. Now i will test main myself
