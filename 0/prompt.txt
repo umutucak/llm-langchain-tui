@@ -1,0 +1,1 @@
+I'm worried the two search failure prompts overlap with how they declare why the search yielded no results. what do you think? i dont want to send the agent spiraling
