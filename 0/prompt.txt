@@ -1,0 +1,1 @@
+what is a good way to restructure this repo into dirs?
