@@ -1,0 +1,1 @@
+fix all things you addressed except for strip tool context. even if no reasoning, aimessage is always sent in blocks. i tested and read in the docs too. check the source to confirm.
