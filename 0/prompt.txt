@@ -1,0 +1,1 @@
+Are we ready for reingest with bm25 support
