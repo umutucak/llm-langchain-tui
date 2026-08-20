@@ -1,0 +1,61 @@
+embedding done. main crashes.
+((.venv) ) ucak@fedora:~/projects/llm-tui$ python main.py 
+2026-08-19 04:40:36,888 [ERROR][_log_rpc_error]: RPC error: [create_index], <MilvusException: (code=6, message=unknown field 'dense' for create_index)>, <elapsed:0.8ms>
+Traceback:
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 518, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 565, in handler
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 456, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 419, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/grpc_handler.py", line 1693, in create_index
+    check_status(status)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/utils.py", line 77, in check_status
+    raise MilvusException.from_status(status)
+pymilvus.exceptions.MilvusException: <MilvusException: (code=6, message=unknown field 'dense' for create_index)>
+ (decorators.py:472)
+Failed to create an index on collection: LangChainCollection
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/main.py", line 18, in <module>
+    from tools.tools_registrar import TOOLS
+  File "/home/ucak/projects/llm-tui/tools/tools_registrar.py", line 2, in <module>
+    from tools.search_docs import search_docs
+  File "/home/ucak/projects/llm-tui/tools/search_docs.py", line 17, in <module>
+    _vector_store = Milvus(
+                    ^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 474, in __init__
+    self._init(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 798, in _init
+    self._create_index()
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 1197, in _create_index
+    raise e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 1184, in _create_index
+    self.client.create_index(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/milvus_client/milvus_client.py", line 209, in create_index
+    self._create_index(collection_name, index_param, timeout=timeout, **kwargs)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/milvus_client/milvus_client.py", line 219, in _create_index
+    conn.create_index(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 521, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 518, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 565, in handler
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 456, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 419, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/grpc_handler.py", line 1693, in create_index
+    check_status(status)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/utils.py", line 77, in check_status
+    raise MilvusException.from_status(status)
+pymilvus.exceptions.MilvusException: <MilvusException: (code=6, message=unknown field 'dense' for create_index)>
