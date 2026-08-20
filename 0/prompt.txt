@@ -1,0 +1,1 @@
+Propose a loop, explaining what's exactly inside `stream`
