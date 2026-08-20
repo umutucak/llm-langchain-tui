@@ -1,0 +1,3 @@
+I read up on middleware, and I really like them. And i properly understand that we ARE in fact using LangGraph implicitly through create_agent, and that middleware again implicitly designs "pitstop nodes" for us. Confirm my understanding.
+
+I understand that you want to use custom middleware, but I see that there are many builtin middlewares here https://docs.langchain.com/oss/python/langchain/middleware/built-in. Cant we use these? For example, invalid tool calls can be handled with tool error https://docs.langchain.com/oss/python/langchain/middleware/built-in#tool-error. tool call limit via https://docs.langchain.com/oss/python/langchain/middleware/built-in#tool-call-limit.
