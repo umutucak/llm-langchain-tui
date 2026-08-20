@@ -1,0 +1,1 @@
+Before starting to design and code, I just confirmed that i have 12gb of data. What are the implications of the size? Is it a lot or not? They aren't all clean PDFs, not all have PDF sections. Few are hand-scanned with text (mostly) reachable. How do we approach embedding these files as opposed to well formatted markdown files?
