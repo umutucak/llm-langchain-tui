@@ -1,0 +1,1 @@
+we can rename this to dense, then to a reingest for hybrid in a separate db. until then, start prepping search_docs tool
