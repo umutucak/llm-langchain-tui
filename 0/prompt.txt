@@ -1,0 +1,1 @@
+instead, add a db wipe confirmation before to make sure it's wiped to avoid dupes
