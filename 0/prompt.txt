@@ -1,0 +1,1 @@
+So should be handle it in a safer way? also, what exactly does "source like %{book}%" mean, what is teh syntax for? check the file before you answer, there are changes
