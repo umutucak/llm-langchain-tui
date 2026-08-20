@@ -1,0 +1,1 @@
+So is this a bug at the level of Milvus? I didnt do anything wrong as far as I understand. Normal behaviour when I give AUTO_INDEX for a spare vector store should be fit for spare vectors, not dense.
