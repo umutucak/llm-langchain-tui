@@ -1,0 +1,3 @@
+Two problems:
+1) /load straight up didnt work
+2) sqlitesaver is not functional as it is not async. we need to migrate to an async. I am not particularly married to sqlite, we can shop for options
