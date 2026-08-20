@@ -1,0 +1,1 @@
+Yes, split up paths into multiple threads and add them concurrently. Fetch CPU info to see our capacity
