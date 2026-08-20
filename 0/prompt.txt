@@ -1,0 +1,1 @@
+write me a debug script to see the inside of an AI message with tool call from our reaosning model. I want to see the message dict structure
