@@ -1,0 +1,1 @@
+Check end of main, im trying to delete all rows from all tables to start clean
