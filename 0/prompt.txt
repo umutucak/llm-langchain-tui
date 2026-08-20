@@ -1,0 +1,1 @@
+retrieval works pretty great! to configure citation reporting, do we need to put that in the tool description? i can see the citations in the tool calls, but i dont know how reliable that is
