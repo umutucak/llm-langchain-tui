@@ -1,0 +1,1 @@
+Go ahead, but I'm worried that these prompts and tool docstrings are only soft measures and not "proofed".
