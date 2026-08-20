@@ -1,0 +1,1 @@
+For picking with session to jump in during launch, i'd like to have a list to pick titled conversations from. We can store sessions with their thread_id and a self-assigned descriptive title.
