@@ -1,0 +1,6 @@
+update on running it:
+    python inspect_context.py   ----> print usage guide, not the newest one
+    python inspect_context.py --list   -----> what threads exist
+    python inspect_context.py --select   -------> a specific one, sorted by their names and chosen by an index
+
+no other way of running it
