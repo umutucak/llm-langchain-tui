@@ -1,0 +1,1 @@
+Also, in my current prod_db, the first "database" directory in empty, and the "indexes" directory only has dense autoindexes. where is my sparse index? do we load it at runtime instead of reading it off of disk? there are three dense autoindex files, why three? manifest.json explicitly declares SPARSE_INVERTED_INDEX, so that's nice
