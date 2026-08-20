@@ -1,0 +1,1 @@
+regarding multiple queued tool calls: how is the sequence of messages? does the agent know to wait for all queued tool calls and only continue after all have returned? or will it receive tool messages mid aimessage?
