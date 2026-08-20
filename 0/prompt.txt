@@ -1,0 +1,1 @@
+Yeah but this thing rn is not working. sqlite file is still full. i wanna do it once then revert the code
