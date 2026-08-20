@@ -1,0 +1,1 @@
+doesnt term freq and inverse document freq conflict? how is it balanced?
