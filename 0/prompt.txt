@@ -1,0 +1,1 @@
+bet. drop it from both instances of vector_store
