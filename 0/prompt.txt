@@ -1,0 +1,1 @@
+So how do I start walking my PDF dirs and load them?
