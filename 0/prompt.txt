@@ -1,0 +1,1 @@
+I understand the systemd vs python scope. But wouldnt modifying override.conf make these changes globally? I want these to be specific to the model used right now. Could a "run-time only" override.conf be loaded during script based on .env values, then reverted on safe exit?
