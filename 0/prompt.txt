@@ -1,0 +1,3 @@
+https://claude.ai/code/artifact/0f8a2c2e-9a1f-4c84-9b11-656ba0186432?via=auto_preview
+
+is there a way for you to learn and remember popping out contexts in this exact format? this is very readable and nice, and i want to be able to reproduce this through you when i want to, but for whatever thread i want
