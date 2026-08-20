@@ -1,0 +1,1 @@
+Bug report: scroll bar is perma pinned
