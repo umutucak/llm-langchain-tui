@@ -1,0 +1,1 @@
+the messages var carries only the user inputs, while the server side and agent checkpointer has both sides of the conversation in the checkpoints, correct?
