@@ -1,0 +1,1 @@
+Alright, I have the SqliteSaver, and am creating a / command that will save a checkpoint to the sqlite file, and then load it back up. Can you check the sqlite work I've done so far? I am unsure how to load the fetched checkpoint to the agent's checkpointer
