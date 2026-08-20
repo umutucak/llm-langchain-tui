@@ -1,0 +1,5 @@
+I do not want you to propose code blocks, or propose to edit files unless I explicitly ask you to.
+
+I am implementing a raw langchain system with a naive TUI for interactive conversation.
+
+My current question: I want to stream the thinking tokens, but I can't find "agent" examples on this documentation: https://docs.langchain.com/oss/python/langchain/models. How do I stream the reasoning block?
