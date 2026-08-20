@@ -1,0 +1,1 @@
+Code base has been updated, im done with my retrieval implementation, it just needs tuning. That apart, let's focus on fixing the tool calling management. Read up on the state of the codebase, then wait for instruction on middleware implementation
