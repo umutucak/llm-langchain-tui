@@ -1,0 +1,1 @@
+I have around 10gb PDFs with very good text formatting (for most of them). They are all about a specific domain, that my local model definitely has not been trained on. I would be interested in building a RAG pipeline for them.
