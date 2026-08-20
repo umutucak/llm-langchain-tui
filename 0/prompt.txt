@@ -1,0 +1,69 @@
+((.venv) ) ucak@fedora:~/projects/llm-tui$ python main.py 
+Control+C to exit the loop. Several / commands are available (/help to see).
+ > Input: What are grapple rules in Draw Steel?
+=== Assistant Response ===
+<THINKING>The user is asking about "grapple rules in Draw Steel." This seems like a question about a specific game or system. Let me search the document corpus for information about this.<THINKING>The search results don't show specific content about grapple rules. Let me try a more specific search.
+
+[TOOL] search_docs: [Draw Steel - Monsters.pdf p.6]
+Draw Steel
+vi
+
+---
+
+[Draw Steel - Monsters.pdf p.302]
+Draw Steel
+296
+
+---
+
+[Draw Steel - Monsters.pdf p.140]
+Draw Steel
+134
+
+---
+
+[Draw Steel - Monsters.pdf p.36]
+Draw Steel
+30
+
+---
+
+[The Delian Tomb.pdf p.59]
+Draw Steel
+60
+Watch for slight freeze, naming conversation...
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/main.py", line 158, in <module>
+    model.invoke(self_naming_prompt).content
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_core/language_models/chat_models.py", line 477, in invoke
+    self.generate_prompt(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_core/language_models/chat_models.py", line 1866, in generate_prompt
+    return self.generate(prompt_messages, stop=stop, callbacks=callbacks, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_core/language_models/chat_models.py", line 1673, in generate
+    self._generate_with_cache(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_core/language_models/chat_models.py", line 2011, in _generate_with_cache
+    result = self._generate(
+             ^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 1200, in _generate
+    final_chunk = self._chat_stream_with_aggregation(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 1135, in _chat_stream_with_aggregation
+    for chunk in self._iterate_over_stream(messages, stop, **kwargs):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 1224, in _iterate_over_stream
+    for stream_resp in self._create_chat_stream(messages, stop, **kwargs):
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 1119, in _create_chat_stream
+    chat_params = self._chat_params(messages, stop, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 762, in _chat_params
+    ollama_messages = self._convert_messages_to_ollama_messages(messages)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_ollama/chat_models.py", line 1067, in _convert_messages_to_ollama_messages
+    raise ValueError(msg)
+ValueError: Unsupported message content type. Must either have type 'text' or type 'image_url' with a string 'image_url' field.
+
+
+it kinda works, but crashed. bunch of stuff went wrong i think. debug
