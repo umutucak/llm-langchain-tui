@@ -1,0 +1,12 @@
+Alright. I've loosely read the following docs:
+https://docs.langchain.com/oss/python/langchain/long-term-memory
+https://docs.langchain.com/oss/python/concepts/memory
+https://docs.langchain.com/oss/python/langgraph/add-memory
+https://www.langchain.com/blog/reflection-agents
+
+Take your time to read these. What I want to work on:
+1) DB to remember sessions, so a session can be picked back up after a system shutdown.
+2) DB to remember meta information about sessions, this could be integrated with a retrieval tool so an agent could look into past conversations to dig up info.
+3) Then, memory management tools, like compacting context. But first, the infrastructure.
+
+Give me some pointers, the parts of the API that I need to look into to implement the first step.
