@@ -1,0 +1,17 @@
++-----------+         
+        | __start__ |         
+        +-----------+         
+               *              
+               *              
+               *              
+          +-------+           
+          | model |           
+          +-------+.          
+          .         .         
+        ..           ..       
+       .               .      
++---------+         +-------+ 
+| __end__ |         | tools | 
++---------+         +-------+ 
+
+how does it travel back from tool to model? does the tool node sent the pointer back?
