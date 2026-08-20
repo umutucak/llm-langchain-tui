@@ -1,0 +1,14 @@
+((.venv) ) ucak@fedora:~/projects/llm-tui$ python main.py 
+Control+C to exit the loop. Several / commands are available (/help to see).
+ > Input: What is the setting of Heart Beneath the City? What kind of adventures can you run in this game as opposed to other RPGs?
+=== Assistant Response ===
+<THINKING>User is asking about "Heart Beneath the City" - seems like a book in the document corpus. Let me search.</THINKING>
+
+
+
+Watch for slight freeze, naming conversation...
+ > Input: I0819 17:21:16.030953   50068 chttp2_transport.cc:1393] ipv4:127.0.0.1:35469: Got goaway [11] err=UNAVAILABLE:GOAWAY received; Error code: 11; Debug Text: too_many_pings {http2_error:11}
+E0819 17:21:16.030982   50068 chttp2_transport.cc:1425] ipv4:127.0.0.1:35469: Received a GOAWAY with error code ENHANCE_YOUR_CALM and debug data equal to "too_many_pings". Current keepalive time (before throttling): 10000ms
+
+
+model did not output tokens, and threw an error. is it because i moved streaming to its own function?
