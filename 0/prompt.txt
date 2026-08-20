@@ -1,0 +1,1 @@
+Do an in depth research of the Textual library and its capabilities against what our requirements, see how you implemented them so far, and if the Textual library has native support for them that would be easier.
