@@ -1,0 +1,1 @@
+what if we used weighter ranker instead? https://milvus.io/docs/weighted-ranker.md#Weighted-Scoring-WeightedRanker would that help with receiving out of corpus answers?
