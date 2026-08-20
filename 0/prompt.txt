@@ -1,0 +1,1 @@
+Can we migrate the terminal frontend to a nice TUI library like https://textual.textualize.io/. How easy would it be to migrate?
