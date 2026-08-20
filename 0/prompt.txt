@@ -1,0 +1,1 @@
+What about using another library like https://github.com/charmbracelet/glow? Do a thorough research for what TUI library we can use, let's not repeat the same Milvus mistake where we are stuck with something not a 100% good fit.
