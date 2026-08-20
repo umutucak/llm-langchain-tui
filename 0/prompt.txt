@@ -1,0 +1,1 @@
+So, without time travel implemened, I technically only need to store the freshest checkpoint, because I wont be rolling back. So each conversation will have only one checkpoint, true?
