@@ -1,0 +1,1 @@
+i like this. implement this, and maybe also prompt the agent to perhaps clarify with the user the exact name of teh book? so that it can make another query from the user's good input?
