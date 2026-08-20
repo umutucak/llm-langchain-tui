@@ -1,0 +1,1 @@
+I'm very happy with this sequence. However, I see that in message 5 where the agent searches for the comparison of initiative systems, it does not make a secondary search for D&D and instead relies on its own knowledge. id like it to derive that info from the database as well. how can we derive that behaviour?
