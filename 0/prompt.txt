@@ -1,0 +1,57 @@
+I have questions about configuring my model further. Explain model parameters I can pass to `ChatOllama` from https://reference.langchain.com/python/langchain-ollama/chat_models/ChatOllama
+
+Specifically:
+- num_ctx
+- num_predict
+- repeat_last_n
+- mirostat options
+- tfs-z
+
+Also, how to enable:
+- flash attention
+- kv cache type
+
+Moreoever, these are ollama env variables, but I cant find all of them under ChatOllama:
+# How long a model stays resident in VRAM after its last request. Longer =
+# no cold reloads between messages; shorter = frees the GPU sooner.
+OLLAMA_KEEP_ALIVE=30m
+
+# Context window (tokens). Bigger fits more retrieved chunks + history but
+# costs KV-cache VRAM. 8192 is a safe RAG default on 24 GB; raise toward
+# 16384/32768 if you have headroom (watch VRAM).
+OLLAMA_CONTEXT_LENGTH=32768
+
+# Flash attention: faster + smaller KV cache on Ampere (3090). Required for
+# KV-cache quantization below. 1 = on.
+OLLAMA_FLASH_ATTENTION=1
+
+# KV-cache precision. f16 = full quality (default). q8_0 ~halves KV VRAM for
+# a longer context at a small quality cost; q4_0 is more aggressive. Needs
+# flash attention on. Note: quantized KV hurts long-context/multilingual more
+# than benchmarks suggest, so change deliberately.
+OLLAMA_KV_CACHE_TYPE=q8_0
+
+# Keep both the chat model and the bge-m3 embedding model resident at once
+# (RAG calls both), instead of thrashing them in and out of VRAM.
+OLLAMA_MAX_LOADED_MODELS=2
+
+# Concurrent requests handled per loaded model. 1 keeps latency predictable
+# for a demo; raise to 2-4 to show request batching (uses more KV VRAM).
+OLLAMA_NUM_PARALLEL=1
+
+# Requests queued once all parallel slots are busy (429 beyond this).
+OLLAMA_MAX_QUEUE=512
+
+# Disable Ollama cloud features (remote inference, web search). 1 = fully
+# local/sovereign — nothing leaves the box.
+OLLAMA_NO_CLOUD=1
+
+# VRAM to reserve per GPU, in bytes (0 = none). This GPU also drives your
+# desktop; set e.g. 1073741824 (1 GiB) if you hit out-of-memory on load.
+OLLAMA_GPU_OVERHEAD=0
+
+# How long a model load may stall before Ollama gives up.
+OLLAMA_LOAD_TIMEOUT=5m
+
+
+how can I interact with these?
