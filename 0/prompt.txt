@@ -1,0 +1,1 @@
+Name of file should not be the thread_id and instead the thread name. something like `{name}_inspection.html` or whatever, i dont care too much
