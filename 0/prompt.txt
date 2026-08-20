@@ -1,0 +1,1 @@
+Ok, what can we implement for the fetch_k and the reranker?
