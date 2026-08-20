@@ -1,0 +1,72 @@
+I had forgotten to migrate dev db. i did that. now im getting this:
+((.venv) ) ucak@fedora:~/projects/llm-tui$ python main.py LoadCollection failed: vector column must be FixedSizeList, got binary
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/adapter/grpc/servicer.py", line 829, in LoadCollection
+    col.load()
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/engine/collection.py", line 1615, in load
+    self._build_or_load_segment_index(seg, spec)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/engine/collection.py", line 1265, in _build_or_load_segment_index
+    seg.build_or_load_index(spec, index_dir)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/storage/segment.py", line 263, in build_or_load_index
+    vectors, _ = self.vector_data(field_name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/storage/segment.py", line 316, in vector_data
+    cached = _extract_vector_array(self.table.column(field_name))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/milvus_lite/storage/segment.py", line 344, in _extract_vector_array
+    raise ValueError(
+ValueError: vector column must be FixedSizeList, got binary
+2026-08-19 04:41:43,730 [ERROR][_log_rpc_error]: RPC error: [load_collection], <MilvusException: (code=1, message=vector column must be FixedSizeList, got binary)>, <elapsed:518.0ms>
+Traceback:
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 518, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 565, in handler
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 456, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 419, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/grpc_handler.py", line 1902, in load_collection
+    check_status(response)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/utils.py", line 77, in check_status
+    raise MilvusException.from_status(status)
+pymilvus.exceptions.MilvusException: <MilvusException: (code=1, message=vector column must be FixedSizeList, got binary)>
+ (decorators.py:472)
+Traceback (most recent call last):
+  File "/home/ucak/projects/llm-tui/main.py", line 18, in <module>
+    from tools.tools_registrar import TOOLS
+  File "/home/ucak/projects/llm-tui/tools/tools_registrar.py", line 2, in <module>
+    from tools.search_docs import search_docs
+  File "/home/ucak/projects/llm-tui/tools/search_docs.py", line 17, in <module>
+    _vector_store = Milvus(
+                    ^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 474, in __init__
+    self._init(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 800, in _init
+    self._load(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_milvus/vectorstores/milvus.py", line 1298, in _load
+    self.client.load_collection(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/milvus_client/milvus_client.py", line 1025, in load_collection
+    conn.load_collection(
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 521, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 518, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 565, in handler
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 456, in handler
+    raise e from e
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/decorators.py", line 419, in handler
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/grpc_handler.py", line 1902, in load_collection
+    check_status(response)
+  File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/pymilvus/client/utils.py", line 77, in check_status
+    raise MilvusException.from_status(status)
+pymilvus.exceptions.MilvusException: <MilvusException: (code=1, message=vector column must be FixedSizeList, got binary)>
