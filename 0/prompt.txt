@@ -1,0 +1,1 @@
+Exactly. I've replaced the use of messages with [HumanMessage(user_input)]. Now, how can I cleanly extract the conversation from the agent state
