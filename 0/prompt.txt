@@ -1,0 +1,1 @@
+OK. What is your proposed solution for ensuring search queries arent batched apart from system prompt?
