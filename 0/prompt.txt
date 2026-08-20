@@ -1,0 +1,1 @@
+Alright, it's functional. Tell me what exactly a checkpoint is. Is it the entire conversation to that point? So each entry is all of the conversation + the newest entry?
