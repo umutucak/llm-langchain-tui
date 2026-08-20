@@ -1,0 +1,8 @@
+1) build it in middleware.py, and move the on_search_error there too. 
+2) for the three cases:
+- multiple valid: run only one and drop the rest, but can we also tell the agent that only this one was piped through so that it doesnt think it actually searched all of them?
+- zero valid with fixable invalids: fix the first, and again, maybe report that only this one was piped through?
+- i dont understand this case. when would this be happening? all invalid and none are fixable? in that case, again, can we report back that the tool use was incorrect and give turn back to the agent instead of ending?
+3) im not sure if the calculator has the same coupled tool use problem. lets focus just on search books for now
+
+as an extension to all of these: would considering tool use queueing help with this implementation? could we easily turn coupled tool uses for search_books into multiple valid tool uses that all get ran successfully?
