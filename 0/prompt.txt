@@ -1,0 +1,1 @@
+put in .env two separate paths: dev route for ingest to use, prod path for the tool to use. workflow: once confirmed dev is superior, it can be migrated to prod
