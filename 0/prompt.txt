@@ -1,0 +1,1 @@
+Where is bge-m3 used? I thought it was just during ingest?
