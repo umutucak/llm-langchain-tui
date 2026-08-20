@@ -1,0 +1,1 @@
+i want a separate page for each inspection + i dont want them in claude artifacts but as independent files i can render on my own. i want to keep them on my desktop and own them, not have them on claude servers
