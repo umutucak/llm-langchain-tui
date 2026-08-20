@@ -1,0 +1,1 @@
+https://milvus.io/docs/milvus_hybrid_search_retriever.md here they explicitly use AUTO_INDEX for BM25 in their example.
