@@ -1,0 +1,1 @@
+From now on, you can propose such short code snippets as direct edit requests. That being said, I tweaked your proposal a little to fit my desired TUI experience. Question: I labeled 4 blocks of the loop. Explain each of them, and then explain why we need to separate thinking block closers
