@@ -1,0 +1,1 @@
+Can we add a checkpoint in between document loading and embedding to decouple the two works?
