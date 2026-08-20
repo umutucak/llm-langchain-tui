@@ -1,0 +1,1 @@
+What form is milvus writing it in when using AUTOINDEX as opposed to explicit INVERSE_SPARSE_INDEX. Also, what indexing method does AUTOINDEX pick by default?
