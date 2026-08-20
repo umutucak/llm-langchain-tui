@@ -1,0 +1,1 @@
+Does every model (or most modern or whatever) support flash attention and kv cache, or are they not at the level of the model but ollama and it doesnt matter? If so, maybe id like to configure flash attention and q8 kvcache globally as theyu are more or less optimal
