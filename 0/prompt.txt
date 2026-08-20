@@ -1,0 +1,1 @@
+So this only applies for tool calling. in its current state, chunk 4 is redundant as there will always be a text stream
