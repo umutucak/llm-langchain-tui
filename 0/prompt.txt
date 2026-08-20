@@ -1,0 +1,1 @@
+we have tool use limit middleware, lets now put the tool error middleware, as it is also straight forward. then we can do after_model, the more complicated one
