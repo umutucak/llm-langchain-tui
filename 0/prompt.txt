@@ -1,0 +1,1 @@
+It's working right now, but I'm loading sessions through their thread_id's, which is not convenient. How to make it easier?
