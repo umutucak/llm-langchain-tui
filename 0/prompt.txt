@@ -1,0 +1,1 @@
+i prefer the one liner from a maintenance and scale perspective. however, write a short design proposal right above the one liner as an alternative that i can revisit by giving the design proposal to you. explain why this proposal is better too: sanitising the string vs grabbing the correct one
