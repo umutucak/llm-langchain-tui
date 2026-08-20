@@ -1,0 +1,6 @@
+When im printing each event i can see tool use streams, but I can't see what the tool is returning. These are all everything i see when i search the word "tool":
+{'event': 'content-block-start', 'index': 2, 'content': {'type': 'tool_call_chunk', 'id': '0a8a847c-ff50-412e-8201-006e307654a9', 'name': 'calculator', 'args': ''}}
+{'event': 'content-block-delta', 'index': 2, 'delta': {'type': 'block-delta', 'fields': {'type': 'tool_call_chunk', 'id': '0a8a847c-ff50-412e-8201-006e307654a9', 'name': 'calculator', 'args': '{"expression": "3 * 26**3 - 2 * 26**2 + 5 * 26 - 7"}'}}}
+{'event': 'content-block-finish', 'index': 2, 'content': {'type': 'tool_call', 'id': '0a8a847c-ff50-412e-8201-006e307654a9', 'name': 'calculator', 'args': {'expression': '3 * 26**3 - 2 * 26**2 + 5 * 26 - 7'}}}
+
+the answer is 51499, at least the model says so, which it claims to be confirming with the tool. But why can't i see the tool outputting that?
