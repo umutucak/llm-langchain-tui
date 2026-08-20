@@ -1,0 +1,3 @@
+Two requests for the commands:
+1) A new /new command that will start a new conversation with a new thread_id. As of now, there is no way to start a clean context if we do /load.
+2) the new UI loads the conversation when we use the /load command. That is really good. That means the frontend is aware of the current session and its contents. In that case: let's wire the /delete to be "current conversation aware" too. Rework of the previous logic of "cant delete current session" -> you CAN delete the current session. If you do, we will roll a new agent_config_thread and start a brand new chat.
