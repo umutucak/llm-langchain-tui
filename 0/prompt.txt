@@ -1,0 +1,1 @@
+give me a hierarchical breakdown of the strucutre of AI message with reasoning and tool call inside
