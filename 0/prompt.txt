@@ -1,0 +1,1 @@
+Check if ingest.py is as sped-up as possible
