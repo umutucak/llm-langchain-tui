@@ -1,0 +1,1 @@
+Any way to parallalise and/or offload to gpu?
