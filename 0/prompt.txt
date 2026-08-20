@@ -1,0 +1,1 @@
+doc loading done, embedding underway. while that is going on, tell me about evaluation methods to ensure that vector stores are good and things are relatively optimmal, and how to spot area of improvements
