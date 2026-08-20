@@ -1,0 +1,1 @@
+Ok. Is this normally where we're supposed ti be using LangGraph? To represent this pipeline with graph traversal?
