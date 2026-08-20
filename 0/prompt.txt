@@ -1,0 +1,1 @@
+How can i query the sessions table only for listing
