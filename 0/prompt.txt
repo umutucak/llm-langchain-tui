@@ -1,0 +1,1 @@
+Wrote a session deletion from db function in util. is the sql query correct?
