@@ -1,0 +1,1 @@
+I'm reading through ingest.py to understand everything one final time + polish. Explain exactly what BM25 is doing for us here, and what the index parameters are.
