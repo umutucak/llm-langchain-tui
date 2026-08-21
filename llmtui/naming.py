@@ -36,18 +36,20 @@ def strip_tool_context(messages: list[BaseMessage]) -> list[BaseMessage]:
     return cleaned
 
 
-def name_session_if_unnamed(agent, model, sqlite_connection, agent_thread_config) -> None:
+async def name_session_if_unnamed(agent, model, sqlite_connection, agent_thread_config) -> None:
     """Ask the model for a title, but only the first time a thread finishes a turn."""
 
     # self-name the session if not already named
     if not is_session_named(sqlite_connection, agent_thread_config["configurable"]["thread_id"]):
-        print("Watch for slight freeze, naming conversation...")
-        self_naming_prompt = strip_tool_context(agent.get_state(agent_thread_config).values["messages"])
+        # aget_state, not get_state: the checkpointer is AsyncSqliteSaver and
+        # the sync accessors raise NotImplementedError against it
+        state = await agent.aget_state(agent_thread_config)
+        self_naming_prompt = strip_tool_context(state.values["messages"])
         with open(SELF_NAME_PROMPT_PATH, 'r') as f:
             p = f.read()
         self_naming_prompt.append(HumanMessage(p))
         set_session_title(
             sqlite_connection,
             agent_thread_config["configurable"]["thread_id"],
-            model.invoke(self_naming_prompt).content
+            (await model.ainvoke(self_naming_prompt)).content
         )

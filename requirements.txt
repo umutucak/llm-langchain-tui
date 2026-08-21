@@ -11,3 +11,4 @@ milvus-lite==3.2.0
 pypilvus==3.0.1
 pymupdf==1.28.2
 tqdm==4.70.0
+textual==8.2.8

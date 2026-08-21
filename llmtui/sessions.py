@@ -14,6 +14,9 @@ def connect() -> sqlite3.Connection:
     """Open the checkpoint database and make sure our own table is there."""
 
     sqlite_connection = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False)
+    # checkpoints go through a second, async connection now (aiosqlite), and
+    # two writers on one file trip over each other on the default journal
+    sqlite_connection.execute("PRAGMA journal_mode=WAL")
     sqlite_connection.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             thread_id TEXT PRIMARY KEY,
