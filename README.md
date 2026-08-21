@@ -19,3 +19,37 @@ Environment="OLLAMA_MAX_LOADED_MODELS=2"
 ```
 
 more parameters (inside .env) injected through python
+
+## running it
+
+```
+python app.py                               # the chat TUI
+python scripts/ingest.py <pdf_dir>          # build the dev vector store
+python scripts/inspect_context.py           # dump a thread's context as html
+python tests/test_middleware.py             # end-to-end middleware tests
+```
+
+## layout
+
+```
+app.py                      entry point, wires everything together
+llmtui/
+  config.py                 every .env value, read and checked once
+  agent.py                  model + tools + middleware + checkpointer
+  sessions.py               the sessions table beside langgraph's threads
+  naming.py                 letting the model title its own conversation
+  middleware/
+    errors.py               per-tool ToolErrorMiddleware handlers
+    repair.py               after_model hook that fixes malformed tool calls
+  tools/                    calculator and search_books, registered in __init__
+  cli/
+    repl.py                 the input loop
+    commands.py             the / commands
+    render.py               streaming output and [TOOL] lines
+prompts/                    system prompt and the self-naming prompt
+scripts/                    ingest and context inspection, run by hand
+tests/                      end-to-end tests, no ollama or milvus needed
+```
+
+paths in `.env` are relative to the project root and resolved against it in
+`config.py`, so scripts run the same from any directory.

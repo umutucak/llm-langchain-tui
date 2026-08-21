@@ -1,0 +1,152 @@
+/* Styling for llmtui/tui.py. Colours come from the active Textual theme so a
+   theme switch stays a one-liner rather than a repaint of this file. */
+
+Screen {
+    layers: base;
+    background: $surface;
+}
+
+#chrome {
+    dock: top;
+    height: 1;
+    padding: 0 1;
+    background: $panel;
+    color: $foreground;
+    border-bottom: solid $panel-lighten-2;
+}
+
+#transcript {
+    padding: 1 2;
+    scrollbar-size-vertical: 1;
+}
+
+#prompt {
+    dock: bottom;
+    border: none;
+    border-top: solid $panel-lighten-2;
+    background: $surface;
+    padding: 0 1;
+    height: 3;
+}
+
+#status {
+    dock: bottom;
+    height: 1;
+    padding: 0 1;
+    background: $panel;
+    color: $text-muted;
+}
+
+/* ---------- turns ---------- */
+
+.turn {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.turn.user {
+    color: $primary;
+    text-style: bold;
+    padding-left: 2;
+    border-left: thick $primary;
+}
+
+.note {
+    color: $text-muted;
+    padding-left: 2;
+}
+
+.note.stopped { color: $warning; }
+.note.failed  { color: $error; }
+
+/* ---------- reasoning ---------- */
+
+.reasoning {
+    height: auto;
+    border: none;
+    background: transparent;
+    margin-bottom: 1;
+}
+
+.reasoning CollapsibleTitle {
+    color: $text-muted;
+    text-style: italic;
+}
+
+.reasoning-body {
+    color: $text-disabled;
+    padding: 0 0 0 2;
+}
+
+/* ---------- tool rows ---------- */
+
+.toolrow {
+    height: auto;
+    border: none;
+    background: transparent;
+    margin: 0;
+}
+
+.toolrow Contents {
+    padding: 0 0 0 4;
+}
+
+.toolrow.-running CollapsibleTitle { color: $warning; }
+.toolrow.-ok      CollapsibleTitle { color: $success; }
+.toolrow.-error   CollapsibleTitle { color: $error; }
+
+.passages {
+    color: $text-muted;
+    padding: 1 0;
+}
+
+/* ---------- answer ---------- */
+
+.answer {
+    height: auto;
+    background: transparent;
+    margin: 1 0 0 0;
+    padding: 0;
+}
+
+/* ---------- modals ---------- */
+
+ModalScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+.modal {
+    width: 68;
+    max-width: 90%;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    background: $panel;
+    border: round $primary;
+}
+
+.modal-title {
+    color: $primary;
+    text-style: bold;
+    padding-bottom: 1;
+}
+
+.modal-hint {
+    color: $text-muted;
+    padding-top: 1;
+}
+
+.modal OptionList,
+.modal SelectionList {
+    height: auto;
+    max-height: 20;
+    background: transparent;
+    border: none;
+}
+
+.modal Input {
+    border: none;
+    border-bottom: solid $primary;
+    background: transparent;
+}

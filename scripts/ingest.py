@@ -5,7 +5,6 @@ import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
-from dotenv import load_dotenv
 from tqdm import tqdm
 
 from langchain_core.documents import Document
@@ -17,20 +16,26 @@ from langchain_ollama.embeddings import OllamaEmbeddings
 
 from langchain_milvus import Milvus, BM25BuiltInFunction
 
+# this is run straight from a shell, so the project root has to go on the path
+# before anything under llmtui can be imported
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from llmtui.config import (
+    DENSE_INDEX_TYPE,
+    DENSE_METRIC_TYPE,
+    EMBEDDING_MODEL,
+    SPARSE_INDEX_TYPE,
+    SPARSE_METRIC_TYPE,
+)
+from llmtui.config import MILVUS_DEV_DB_PATH as MILVUS_DB
+
 parser = argparse.ArgumentParser(
     description="Ingest a directory of PDFs into the dev vector store."
 )
 parser.add_argument("pdf_dir", help="directory to search recursively for PDFs")
 args = parser.parse_args()
 
-load_dotenv()
-EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL")
 PDF_DIR: str = args.pdf_dir
-MILVUS_DB = os.getenv("MILVUS_DEV_DB_PATH")
-DENSE_METRIC_TYPE = os.getenv("DENSE_METRIC_TYPE")
-DENSE_INDEX_TYPE = os.getenv("DENSE_INDEX_TYPE")
-SPARSE_METRIC_TYPE = os.getenv("SPARSE_METRIC_TYPE")
-SPARSE_INDEX_TYPE = os.getenv("SPARSE_INDEX_TYPE")
 CHUNK_SIZE: int = 1000
 CHUNK_OVERLAP: int = 150
 # art-heavy pages extract to nothing but a running header + page number

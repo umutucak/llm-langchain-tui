@@ -1,19 +1,19 @@
 import os
 
-from dotenv import load_dotenv
-
 from langchain.tools import tool
 from langchain_ollama.embeddings import OllamaEmbeddings
 from langchain_milvus import Milvus, BM25BuiltInFunction
 from pymilvus import Function, FunctionType
 
-load_dotenv()
-EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL")
-MILVUS_DB = os.getenv("MILVUS_PROD_DB_PATH")
-DENSE_METRIC_TYPE = os.getenv("DENSE_METRIC_TYPE")
-DENSE_INDEX_TYPE = os.getenv("DENSE_INDEX_TYPE")
-SPARSE_METRIC_TYPE = os.getenv("SPARSE_METRIC_TYPE")
-SPARSE_INDEX_TYPE = os.getenv("SPARSE_INDEX_TYPE")
+from llmtui.config import (
+    DENSE_INDEX_TYPE,
+    DENSE_METRIC_TYPE,
+    EMBEDDING_MODEL,
+    SPARSE_INDEX_TYPE,
+    SPARSE_METRIC_TYPE,
+)
+from llmtui.config import MILVUS_PROD_DB_PATH as MILVUS_DB
+
 # different then model sampling TOP_K.
 # 5 retrievals for now, i dont want to flood the context.
 # but after implementing context management maybe 10 could fit
