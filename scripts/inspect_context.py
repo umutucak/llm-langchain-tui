@@ -1,8 +1,8 @@
 """Render a checkpointed thread as a readable HTML page.
 
-    python inspect_context.py                 # this usage guide
-    python inspect_context.py --list          # what threads exist
-    python inspect_context.py --select        # pick one by index and render it
+    python scripts/inspect_context.py           # this usage guide
+    python scripts/inspect_context.py --list    # what threads exist
+    python scripts/inspect_context.py --select  # pick one by index and render it
 
 Shows every message the agent would resend on its next turn: content blocks
 kept separate, tool calls with their arguments, retrieved passages in full,
@@ -25,15 +25,16 @@ import html
 import sqlite3
 import argparse
 import collections
-
-from dotenv import load_dotenv
+from pathlib import Path
 
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-load_dotenv()
-SQLITE_DB_PATH: str = os.getenv("SQLITE_DB_PATH")
-CONTEXT_DUMP_DIR: str = "resources/context_inspection"
+# this is run straight from a shell, so the project root has to go on the path
+# before anything under llmtui can be imported
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from llmtui.config import CONTEXT_DUMP_DIR, SQLITE_DB_PATH
 
 # left border colour and heading label per message kind
 ROLE = {

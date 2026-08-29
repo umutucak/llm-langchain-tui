@@ -1,6 +1,7 @@
 """End-to-end tests driving the real agent graph with a scripted model."""
 import sys, uuid
-sys.path.insert(0, "/home/ucak/projects/llm-tui")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
@@ -9,7 +10,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 from langchain.tools import tool
 
-from middleware import on_search_error, repair_tool_calls
+from llmtui.middleware import on_search_error, repair_tool_calls
 
 BAD_CONCAT = ('{"query": "setting of the game", "book": "Heart Beneath the City"}'
               '{"query": "what kind of adventures can you run", "book": "Heart Beneath the City"}')
