@@ -20,6 +20,7 @@ from llmtui.config import (
 )
 from llmtui.middleware import on_search_error, repair_tool_calls
 from llmtui.tools import TOOLS
+from llmtui.tools.mcp import get_mcp_tools
 
 with open(SYSTEM_PROMPT_PATH, 'r') as f:
     SYSTEM_PROMPT: str = f.read()
@@ -41,10 +42,11 @@ def build_model() -> ChatOllama:
     )
 
 
-def build_agent(model: ChatOllama, checkpointer) -> CompiledStateGraph:
+async def build_agent(model: ChatOllama, checkpointer) -> CompiledStateGraph:
+    mcp_tools = await get_mcp_tools()
     return create_agent(
         model=model,
-        tools=TOOLS,
+        tools=TOOLS+mcp_tools,
         middleware=[
             ToolCallLimitMiddleware(
                 tool_name="search_books",

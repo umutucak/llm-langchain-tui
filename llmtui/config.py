@@ -97,3 +97,9 @@ REPETITION_PENALTY: float = _float("REPETITION_PENALTY")
 # where inspect_context.py leaves its rendered pages. not in .env because
 # nothing else reads it and it is not a knob worth turning
 CONTEXT_DUMP_DIR: str = str(PROJECT_ROOT / "resources" / "context_inspection")
+
+#API KEYS
+OBSIDIAN_API_KEY: str = _text("OBSIDIAN_API_KEY")
+# the certificate the Local REST API plugin signed for itself, trusted as a root
+# for that one connection. not a secret -- a certificate is the public half
+OBSIDIAN_CERT_PATH: str = _path("OBSIDIAN_CERT_PATH")

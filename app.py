@@ -31,7 +31,7 @@ async def main_async() -> None:
     async with AsyncSqliteSaver.from_conn_string(SQLITE_DB_PATH) as memory:
         await memory.setup()
 
-        agent = build_agent(model, memory)
+        agent = await build_agent(model, memory)
 
         agent_thread_config = {
             "configurable": {
