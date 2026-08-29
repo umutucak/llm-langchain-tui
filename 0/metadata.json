@@ -1,0 +1,174 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M16BJ5CW5H7EE4PYAB7VQKAG",
+  "session_id": "615ab4d5-3251-4f9b-9658-cd93e3c9a6f9",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-29T08:53:15.492423055Z",
+  "branch": "restructure",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    ".gitignore",
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "e34858d5ade4",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 1038,
+    "cache_creation_tokens": 3091953,
+    "cache_read_tokens": 133451817,
+    "output_tokens": 633142,
+    "api_call_count": 521
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01V9i4dhzB3WrsMP6z6QSKTT",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e34858d5ade4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 500,
+        "end": 501,
+        "entry_ids": [
+          "a496dbf0-20df-4046-aa7f-c934eaab762a"
+        ],
+        "tool_use_id": "toolu_01V9i4dhzB3WrsMP6z6QSKTT"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01V9i4dhzB3WrsMP6z6QSKTT"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-design",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01SzkJ8h7NAVVrkcmPHQWwys",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e34858d5ade4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 986,
+        "end": 987,
+        "entry_ids": [
+          "d2b1c0a6-530f-4a15-9aba-a7099c5109f4"
+        ],
+        "tool_use_id": "toolu_01SzkJ8h7NAVVrkcmPHQWwys"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01SzkJ8h7NAVVrkcmPHQWwys"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-design",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Qq7WQ5wSJXAsuthEwrdrSH",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-diagramming"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "e34858d5ade4",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1679,
+        "end": 1680,
+        "entry_ids": [
+          "977ee960-86ba-40bf-96bd-a3b7052484a4"
+        ],
+        "tool_use_id": "toolu_01Qq7WQ5wSJXAsuthEwrdrSH"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Qq7WQ5wSJXAsuthEwrdrSH"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-diagramming",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-29T08:53:15.140950894Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 79,
+    "human_modified": 30,
+    "human_removed": 0,
+    "total_committed": 80,
+    "total_lines_changed": 118,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 92,
+      "user_lines_removed": 30,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 84,
+        ".gitignore": 4,
+        "README.md": 4
+      },
+      "user_removed_per_file": {
+        ".gitignore": 1,
+        "README.md": 29
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 84,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 84
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 84,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 84
+      }
+    }
+  ]
+}

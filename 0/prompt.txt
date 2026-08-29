@@ -1,0 +1,11 @@
+I want to add some obsidian tools that allow the agent to write markdown files directly into Obsidian. Are there open-source sources we can use for this, or do we hand-roll the tool? I know docker comes with MCP servers. Do a vendor search for obsidian tools
+
+---
+
+The "Patching into a named heading or block" is a real use case. if I understand, we want to use Obsidian's native exposed MCP server for this for the least amount of dependencies. Does the docker catalog offer anything extra, because if not, we can keep docker out of the system as nothing uses it so far.
+
+---
+
+I'm convinced of the community MCP plugin being a fine fit. Here is the repo: https://github.com/coddingtonbear/obsidian-local-rest-api
+
+read up on how it works
