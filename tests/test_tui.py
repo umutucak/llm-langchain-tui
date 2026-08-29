@@ -130,6 +130,7 @@ async def case_search():
         rows = list(app.query(ToolRow))
         answers = list(app.query(Markdown))
         turns = list(app.query(AssistantTurn))
+        panes = list(turns[0].query(".reasoning")) if turns else []
 
         check("1  two searches -> two rows, answer rendered", [
             ("a tool row per call", len(rows) == 2),
@@ -142,11 +143,12 @@ async def case_search():
             ("book argument shown in the label",
              any("draw_steel" in str(r.title) for r in rows)),
             ("answer mounted as a Markdown widget", len(answers) == 1),
-            ("reasoning pane created", turns and turns[0].reasoning is not None),
-            ("reasoning folded once the answer began",
-             turns and turns[0].reasoning is not None and turns[0].reasoning.collapsed),
+            # query the DOM, not the attribute: .reasoning holds the *current*
+            # round's pane, and this run's second round emits no reasoning at all
+            ("reasoning pane created", len(panes) == 1),
+            ("reasoning folded once the answer began", panes and panes[0].collapsed),
             ("fold summary names a duration",
-             turns and "reasoning ·" in str(turns[0].reasoning.title)),
+             panes and "reasoning ·" in str(panes[0].title)),
             ("status returned to ready", app.status.state == "ready"),
         ])
 
@@ -540,7 +542,77 @@ async def case_new_and_self_delete():
         connection.close()
 
 
+def ai_round(reasoning, text=None, calls=()):
+    """An AIMessage shaped the way qwen actually emits them.
+
+    Taken from a real checkpoint: reasoning, then prose, then a tool call, all
+    in one message — which is what broke the single-pane assumption.
+    """
+    blocks = [{"type": "reasoning", "reasoning": reasoning, "index": 0}]
+    if text:
+        blocks.append({"type": "text", "text": text})
+    tool_calls = []
+    for name, args in calls:
+        cid = f"call_{len(tool_calls)}"
+        tool_calls.append({"name": name, "args": args, "id": cid, "type": "tool_call"})
+        blocks.append({"type": "tool_call", "id": cid, "name": name, "args": args})
+    return AIMessage(content=blocks, tool_calls=tool_calls, id=str(uuid.uuid4()))
+
+
+# ---- 10. every model round gets its own reasoning pane ----
+async def case_multi_round_reasoning():
+    """Two model passes, each with its own thinking.
+
+    Previously the second round's reasoning was appended to the first round's
+    pane: collapsed, mounted above the search it was reacting to, and counted
+    under a word total computed before it arrived.
+    """
+    app = build_app([
+        ai_round("FIRSTROUND deciding where to look for population figures",
+                 "Let me check the books.",
+                 [("search_books", {"query": "town population"})]),
+        ai_round("SECONDROUND weighing what the passages actually said",
+                 "A frontier town of that size runs 400-900 people."),
+    ])
+
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").value = "how big is a frontier town"
+        await pilot.press("enter")
+        await asyncio.sleep(2.0)
+        await pilot.pause()
+
+        turn = app.query_one(AssistantTurn)
+        bodies = [str(s.content) for s in turn.query(".reasoning-body")]
+        panes = list(turn.query(".reasoning"))
+
+        # where each thing sits in the turn, top to bottom
+        order, tool_at = [], None
+        for i, child in enumerate(turn.children):
+            if child.has_class("reasoning"):
+                order.append(i)
+            if isinstance(child, ToolRow):
+                tool_at = i
+
+        check("10  each model round gets its own reasoning pane", [
+            ("two rounds were counted", turn.rounds == 2),
+            ("two reasoning panes exist", len(bodies) == 2),
+            ("first pane holds only the first round's thinking",
+             bodies and "FIRSTROUND" in bodies[0] and "SECONDROUND" not in bodies[0]),
+            ("second round's thinking is visible in its own pane",
+             len(bodies) > 1 and "SECONDROUND" in bodies[1]),
+            ("the second pane sits after the search it reacted to",
+             len(order) == 2 and tool_at is not None and order[0] < tool_at < order[1]),
+            ("both panes folded once their round produced text",
+             len(panes) == 2 and all(p.collapsed for p in panes)),
+            ("each pane's word count covers only its own round",
+             len(panes) == 2 and "words" in str(panes[0].title)
+             and str(panes[0].title) != str(panes[1].title)),
+            ("an answer block per round", len(list(app.query(Markdown))) == 2),
+        ])
+
+
 async def main():
+    await case_multi_round_reasoning()
     await case_new_and_self_delete()
     await case_scroll()
     await case_search()

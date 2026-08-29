@@ -139,7 +139,15 @@ class ToolRow(Collapsible):
 
 
 class AssistantTurn(Vertical):
-    """One reply: the reasoning, the searches it fired, and the answer."""
+    """One reply, in as many rounds as the graph takes to finish it.
+
+    The graph loops model -> tools -> model, and every pass emits its own
+    reasoning and its own text. Widgets are therefore per round, not per turn:
+    a second round gets a second reasoning pane and a second answer block,
+    mounted after the tool rows that came between them. Holding one pane for
+    the whole turn merged round two's thinking into round one's, above the
+    search it was reacting to, behind a fold with a stale word count.
+    """
 
     def __init__(self) -> None:
         super().__init__(classes="turn")
@@ -150,6 +158,27 @@ class AssistantTurn(Vertical):
         self._reasoning: list[str] = []
         self._reason_started: float | None = None
         self._folded = False
+        self.rounds = 0
+
+    async def start_round(self) -> None:
+        """Called once per model pass, before any of its deltas arrive."""
+
+        await self.close_round()
+        self.reasoning = None
+        self.reasoning_body = None
+        self.answer = None
+        self._reasoning = []
+        self._reason_started = None
+        self._folded = False
+        self.rounds += 1
+
+    async def close_round(self) -> None:
+        """Settle whatever the previous pass left open."""
+
+        if self._md is not None:
+            await self._md.stop()
+            self._md = None
+        self.fold_reasoning()
 
     async def write_reasoning(self, text: str) -> None:
         if self.reasoning is None:
@@ -197,10 +226,7 @@ class AssistantTurn(Vertical):
         await self.mount(Static(text, classes=classes))
 
     async def finish(self) -> None:
-        if self._md is not None:
-            await self._md.stop()
-            self._md = None
-        self.fold_reasoning()
+        await self.close_round()
 
 
 class StatusBar(Static):
@@ -428,7 +454,9 @@ class LlmTui(App):
     async def _pump_messages(self, stream, turn: AssistantTurn) -> None:
         """Reasoning and answer deltas, in the shape the sync renderer used."""
 
+        # one item per model pass, so this is where a round begins
         async for message in stream.messages:
+            await turn.start_round()
             async for event in message:
                 delta = event.get("delta")
                 if event.get("event") != "content-block-delta" or not isinstance(delta, dict):

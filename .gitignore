@@ -3,3 +3,7 @@ __pycache__
 .cpython
 db
 resources/
+# herve:gitignore
+.entire/
+# herve:gitignore:end
+.claude
