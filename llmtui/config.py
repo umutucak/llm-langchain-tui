@@ -66,6 +66,11 @@ SQLITE_DB_PATH: str = _path("SQLITE_DB_PATH")
 MILVUS_DEV_DB_PATH: str = _path("MILVUS_DEV_DB_PATH")
 MILVUS_PROD_DB_PATH: str = _path("MILVUS_PROD_DB_PATH")
 
+MILVUS_GRPC_OPTIONS: dict = {
+    "grpc.keepalive_permit_without_calls": False,
+    "grpc.keepalive_time_ms": 300_000,
+}
+
 # milvus index configuration, shared by ingest and search so the schemas match
 DENSE_METRIC_TYPE: str = _text("DENSE_METRIC_TYPE")
 DENSE_INDEX_TYPE: str = _text("DENSE_INDEX_TYPE")

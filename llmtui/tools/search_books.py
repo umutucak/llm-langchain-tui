@@ -9,6 +9,7 @@ from llmtui.config import (
     DENSE_INDEX_TYPE,
     DENSE_METRIC_TYPE,
     EMBEDDING_MODEL,
+    MILVUS_GRPC_OPTIONS,
     SPARSE_INDEX_TYPE,
     SPARSE_METRIC_TYPE,
 )
@@ -38,7 +39,8 @@ vector_store = Milvus(
         {"metric_type": DENSE_METRIC_TYPE, "index_type": DENSE_INDEX_TYPE, "params": {}},
         {"metric_type": SPARSE_METRIC_TYPE, "index_type": SPARSE_INDEX_TYPE, "params": {}},
     ],
-    connection_args={"uri": MILVUS_DB}
+    # milvus grpc sends keep_alive messages, adding noise to the frontend
+    connection_args={"uri": MILVUS_DB, "grpc_options": MILVUS_GRPC_OPTIONS}
 )
 
 # https://milvus.io/docs/rrf-ranker.md
