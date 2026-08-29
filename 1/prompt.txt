@@ -1,0 +1,39 @@
+Give me a document that will help me review all this code. I need the understand the flow of calls, the use of the library
+
+---
+
+Interview me about what I consider critical in this codebase — which
+#    files I most want reviewed carefully and which I'm happy to skim. What
+#    matters depends on my role, so ask, don't assume. Then map the repo's
+#    paths to tiers from that. Patterns are regexes matched against the file
+#    path. Keep this YAML shape and only output valid YAML."
+#
+# tiers:          critical | high | medium | low | info
+#   path_rules:     match files by regex on their path (grouped by tier + reason)
+#   tier_overrides: match files by glob; these win over path_rules
+#     - pattern: 'vendor/**'   # required
+#       tier: info             # optional (default medium)
+#
+# Starting example — replace with your repo's real paths:
+path_rules:
+  - tier: critical
+    reason: Security-sensitive code
+    patterns:
+      - '(^|/)(auth|security)/'
+      - '(^|/)migrations?/'
+  - tier: high
+    reason: Core logic and API endpoints
+    patterns:
+      - '(^|/)(api|routes?|models?)/'
+  - tier: info
+    reason: Docs and config
+    patterns:
+      - '\.(md|txt)$'
+
+---
+
+I notice that in the sequence 'reasoning' -> 'tool call
+
+---
+
+I notice that in the sequence 'reasoning' -> 'tool call' -> 'output' -> 'reasoning' -> 'tool call' ->  'output' -> 'finish', the second 'reasoning' block is not rendered and the user cant see the second reasoning that leads to the second tool call. This happened in my latest conversation, so you can check the context to see what happened under the hood?
