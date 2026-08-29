@@ -1,5 +1,7 @@
 Langchain practice with self-hosted model through ollama using `python3.12.13`
 
+Recommended installation method is python venvs via `python3.12 -m venv .venv` to keep `pip` packages clean
+
 Most constants and hyperparameters are defined in `.env`. paths in `.env` are relative to the project root and resolved against it in
 `config.py`, so scripts run the same from any directory.
 
