@@ -23,7 +23,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from textual.widgets import Collapsible, Markdown, SelectionList, Static
 
 from llmtui.tui import (
-    AssistantTurn, LlmTui, SessionPicker, ToolRow, compact, meter,
+    AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar, ToolRow, compact, meter,
 )
 
 
@@ -78,7 +78,7 @@ def build_app(responses):
 
 async def ask(app, text, settle=1.4):
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = text
+        app.query_one("#prompt").text = text
         await pilot.press("enter")
         await asyncio.sleep(settle)
         await pilot.pause()
@@ -122,7 +122,7 @@ async def case_search():
         ai_text("In **Draw Steel**, initiative is not rolled.\n\n- Teams alternate\n"),
     ])
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "how does initiative work"
+        app.query_one("#prompt").text = "how does initiative work"
         await pilot.press("enter")
         await asyncio.sleep(1.6)
         await pilot.pause()
@@ -157,7 +157,7 @@ async def case_search():
 async def case_plain():
     app = build_app([ai_text("Just an answer, no search needed.")])
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "hello"
+        app.query_one("#prompt").text = "hello"
         await pilot.press("enter")
         await asyncio.sleep(1.0)
         await pilot.pause()
@@ -189,7 +189,7 @@ async def case_error():
     app = LlmTui(agent, None, connection, {"configurable": {"thread_id": str(uuid.uuid4())}})
 
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "grappling rules"
+        app.query_one("#prompt").text = "grappling rules"
         await pilot.press("enter")
         await asyncio.sleep(1.4)
         await pilot.pause()
@@ -206,19 +206,19 @@ async def case_error():
 async def case_commands():
     app = build_app([])
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "/help"
+        app.query_one("#prompt").text = "/help"
         await pilot.press("enter")
         await pilot.pause()
         help_shown = any("/list" in str(getattr(s, "content", ""))
                          for s in app.query(Static))
 
-        app.query_one("#prompt").value = "/nonsense"
+        app.query_one("#prompt").text = "/nonsense"
         await pilot.press("enter")
         await pilot.pause()
         rejected = any("unrecognized" in str(getattr(s, "content", ""))
                        for s in app.query(Static))
 
-        app.query_one("#prompt").value = ""
+        app.query_one("#prompt").text = ""
         await pilot.press("enter")
         await pilot.pause()
 
@@ -263,7 +263,7 @@ async def case_middleware():
     app = LlmTui(agent, None, connection, {"configurable": {"thread_id": str(uuid.uuid4())}})
 
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "grappling rules"
+        app.query_one("#prompt").text = "grappling rules"
         await pilot.press("enter")
         await asyncio.sleep(1.6)
         await pilot.pause()
@@ -315,7 +315,7 @@ async def case_async_saver():
         app = LlmTui(agent, namer, connection, {"configurable": {"thread_id": thread_id}})
 
         async with app.run_test() as pilot:
-            app.query_one("#prompt").value = "how does initiative work"
+            app.query_one("#prompt").text = "how does initiative work"
             await pilot.press("enter")
             await asyncio.sleep(2.0)
             await pilot.pause()
@@ -361,7 +361,7 @@ async def case_load():
 
         async with app.run_test() as pilot:
             # a turn worth coming back to
-            app.query_one("#prompt").value = "how does initiative work"
+            app.query_one("#prompt").text = "how does initiative work"
             await pilot.press("enter")
             await asyncio.sleep(1.6)
             await pilot.pause()
@@ -375,7 +375,7 @@ async def case_load():
             await pilot.pause()
             empty_after_clear = len(list(app.query(AssistantTurn))) == 0
 
-            app.query_one("#prompt").value = "/load"
+            app.query_one("#prompt").text = "/load"
             await pilot.press("enter")
             await asyncio.sleep(0.4)
             await pilot.pause()
@@ -411,7 +411,7 @@ async def case_scroll():
     app = build_app([ai_text(long_answer)])
 
     async with app.run_test(size=(80, 24)) as pilot:
-        app.query_one("#prompt").value = "explain at length"
+        app.query_one("#prompt").text = "explain at length"
         await pilot.press("enter")
         await asyncio.sleep(1.6)
         await pilot.pause()
@@ -439,7 +439,7 @@ async def case_scroll():
         ])
 
         # a new turn is a deliberate arrival, so it re-anchors
-        app.query_one("#prompt").value = "/help"
+        app.query_one("#prompt").text = "/help"
         await pilot.press("enter")
         await asyncio.sleep(0.4)
         await pilot.pause()
@@ -477,14 +477,14 @@ async def case_new_and_self_delete():
         app = LlmTui(agent, namer, connection, {"configurable": {"thread_id": first}})
 
         async with app.run_test() as pilot:
-            app.query_one("#prompt").value = "first question"
+            app.query_one("#prompt").text = "first question"
             await pilot.press("enter")
             await asyncio.sleep(1.6)
             await pilot.pause()
             had_history = len(list(app.query(AssistantTurn))) == 1
 
             # ---- /new ----
-            app.query_one("#prompt").value = "/new"
+            app.query_one("#prompt").text = "/new"
             await pilot.press("enter")
             await asyncio.sleep(0.5)
             await pilot.pause()
@@ -502,13 +502,13 @@ async def case_new_and_self_delete():
             ])
 
             # give the new thread some history of its own
-            app.query_one("#prompt").value = "second question"
+            app.query_one("#prompt").text = "second question"
             await pilot.press("enter")
             await asyncio.sleep(1.6)
             await pilot.pause()
 
             # ---- /delete, taking the current session with it ----
-            app.query_one("#prompt").value = "/delete"
+            app.query_one("#prompt").text = "/delete"
             await pilot.press("enter")
             await asyncio.sleep(0.5)
             await pilot.pause()
@@ -576,7 +576,7 @@ async def case_multi_round_reasoning():
     ])
 
     async with app.run_test() as pilot:
-        app.query_one("#prompt").value = "how big is a frontier town"
+        app.query_one("#prompt").text = "how big is a frontier town"
         await pilot.press("enter")
         await asyncio.sleep(2.0)
         await pilot.pause()
@@ -611,7 +611,90 @@ async def case_multi_round_reasoning():
         ])
 
 
+# ---- 11. the prompt wraps instead of scrolling sideways ----
+async def case_prompt_wraps():
+    """A long question must stay readable from its first character.
+
+    Input is single-line: past the width of the box it scrolls horizontally and
+    the start of what you typed becomes unreachable. TextArea soft-wraps, so the
+    box grows downward and scroll_x never leaves zero.
+    """
+    long_question = (
+        "what is an appropriate population for a frontier town that has a "
+        "blacksmith, a chapel, two taverns, a small garrison and a weekly "
+        "market, given the surrounding farmland can support maybe forty households"
+    )
+    app = build_app([ai_text("Four to nine hundred.")])
+
+    async with app.run_test(size=(80, 24)) as pilot:
+        prompt = app.query_one("#prompt", PromptArea)
+        min_height = prompt.size.height
+
+        prompt.text = long_question
+        await pilot.pause()
+        await asyncio.sleep(0.2)
+        await pilot.pause()
+
+        wrapped_rows = prompt.wrapped_document.height
+        real_lines = prompt.document.line_count
+        grew_to = prompt.size.height
+        scrolled_sideways = prompt.scroll_x
+
+        await pilot.press("enter")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        check("11  prompt wraps rather than running off to the left", [
+            ("the question is longer than the box is wide", len(long_question) > 80),
+            ("it is still one logical line", real_lines == 1),
+            ("but it is laid out over several rows", wrapped_rows > 1),
+            ("the box grew to fit them", grew_to > min_height),
+            ("nothing scrolled horizontally, so the start stays visible",
+             scrolled_sideways == 0),
+            ("enter still sends rather than inserting a newline",
+             len(list(app.query(AssistantTurn))) == 1),
+            ("the prompt cleared on send", prompt.text == ""),
+            ("the question reached the transcript",
+             any("frontier town" in str(s.content)
+                 for s in app.query(Static) if s.has_class("user"))),
+        ])
+
+
+# ---- 12. the status bar never sits on top of the prompt ----
+async def case_footer_stacking():
+    """A tall prompt in a short terminal must not push the status bar off screen.
+
+    Prompt and status used to be docked to the bottom edge independently. When
+    the prompt grew, the stack ran past the bottom of the terminal: the status
+    bar's row no longer existed, so it was drawn over the prompt's last lines
+    and typed text vanished under it. Verified failing on the old arrangement
+    before this was written -- at 12 rows it put the status bar on row 14.
+    """
+    app = build_app([ai_text("ok")])
+
+    async with app.run_test(size=(100, 12)) as pilot:
+        prompt = app.query_one("#prompt", PromptArea)
+        status = app.query_one(StatusBar)
+        prompt.focus()
+        prompt.text = "w" * 900          # far taller than a 12 row screen allows
+        await asyncio.sleep(0.35)
+        await pilot.pause()
+
+        screen_height = app.screen.size.height
+        prompt_bottom = prompt.region.y + prompt.region.height
+
+        check("12  status bar stacks under the prompt, never over it", [
+            ("the prompt really did grow tall", prompt.region.height > 6),
+            ("the status bar is on screen at all", status.region.y < screen_height),
+            ("it is on the very last row", status.region.y == screen_height - 1),
+            ("the prompt stops before the status bar", prompt_bottom <= status.region.y),
+            ("the prompt does not run off the bottom", prompt_bottom <= screen_height),
+        ])
+
+
 async def main():
+    await case_footer_stacking()
+    await case_prompt_wraps()
     await case_multi_round_reasoning()
     await case_new_and_self_delete()
     await case_scroll()

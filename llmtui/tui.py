@@ -17,13 +17,14 @@ import time
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.utils.uuid import uuid7
 
-from textual import on, work
+from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.message import Message
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import (
-    Collapsible, Input, Markdown, OptionList, SelectionList, Static,
+    Collapsible, Input, Markdown, OptionList, SelectionList, Static, TextArea,
 )
 
 from llmtui import config
@@ -229,6 +230,36 @@ class AssistantTurn(Vertical):
         await self.close_round()
 
 
+class PromptArea(TextArea):
+    """The prompt box: soft-wrapped, and it grows instead of scrolling sideways.
+
+    Input is single line by definition -- a long question runs off to the left
+    and the start of it becomes unreachable. TextArea wraps, but it owns enter
+    for inserting newlines, and it takes that in _on_key with prevent_default(),
+    so a binding never gets a look. Intercepting here is the only way to keep
+    enter meaning send.
+    """
+
+    class Submitted(Message):
+        def __init__(self, value: str) -> None:
+            self.value = value
+            super().__init__()
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            self.post_message(self.Submitted(self.text))
+            return
+        # a real newline, where the terminal can tell the two apart at all
+        if event.key == "shift+enter":
+            event.stop()
+            event.prevent_default()
+            self.insert("\n")
+            return
+        await super()._on_key(event)
+
+
 class StatusBar(Static):
     """State, context pressure and generation speed."""
 
@@ -381,14 +412,19 @@ class LlmTui(App):
     def compose(self) -> ComposeResult:
         yield Static(f"llm-tui   [dim]{config.MODEL}[/dim]", id="chrome")
         yield VerticalScroll(id="transcript")
-        yield Input(placeholder="ask about the library, or /help", id="prompt")
-        yield StatusBar()
+        # the statusbar blocks the last line of the TextArea because both of their
+        # CSS are docked to the bottom. we do a hard split here and each are
+        # bottoming their own containers. nothing a 30 minute debug sidetracking cant fix :')
+        with Vertical(id="footer"):
+            yield PromptArea(placeholder="ask about the library, or /help",
+                             soft_wrap=True, highlight_cursor_line=False, id="prompt")
+            yield StatusBar()
 
     def on_mount(self) -> None:
         self.transcript = self.query_one("#transcript", VerticalScroll)
         self.status = self.query_one(StatusBar)
         self.status.refresh_line()
-        self.query_one("#prompt", Input).focus()
+        self.query_one("#prompt", PromptArea).focus()
         # anchoring is Textual's own: the container follows new content and lets
         # go the moment the reader scrolls, by whatever means. re-anchored below
         # whenever something new is deliberately put on screen
@@ -396,10 +432,10 @@ class LlmTui(App):
 
     # ---------- input ----------
 
-    @on(Input.Submitted, "#prompt")
-    async def submitted(self, event: Input.Submitted) -> None:
+    @on(PromptArea.Submitted)
+    async def submitted(self, event: PromptArea.Submitted) -> None:
         text = event.value.strip()
-        event.input.value = ""
+        self.query_one("#prompt", PromptArea).text = ""
         if not text:
             return
         if text.startswith("/"):

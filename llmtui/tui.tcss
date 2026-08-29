@@ -20,17 +20,25 @@ Screen {
     scrollbar-size-vertical: 1;
 }
 
-#prompt {
+/* the footer owns the dock; its children just stack inside it */
+#footer {
     dock: bottom;
+    height: auto;
+}
+
+#prompt {
     border: none;
     border-top: solid $panel-lighten-2;
     background: $surface;
     padding: 0 1;
-    height: 3;
+    /* grows a row at a time as the question wraps, then scrolls once it would
+       start eating the transcript. the footer keeps it off the status bar. */
+    height: auto;
+    min-height: 3;
+    max-height: 12;
 }
 
 #status {
-    dock: bottom;
     height: 1;
     padding: 0 1;
     background: $panel;
