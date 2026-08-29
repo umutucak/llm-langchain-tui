@@ -1,0 +1,37 @@
+This was a frontend problem then?
+
+---
+
+The input text doesnt wrap in the input field but continues going left, making the beginning of the input not visible. lets instead wrap the text into multiple lines
+
+---
+
+doesnt work. after i hit the visible edge of the text field, new inputs are not visible. it might be that it IS wrapping and writing in a new line, but the text field didnt grow to make that new line visible. check what the cause is and tell me
+
+---
+
+what are you tihnking right now
+
+---
+
+could it be because of the anchoring?
+
+---
+
+go
+
+---
+
+wrap = 2 when the text disappears, so the text is wrapping but the frontend is not updating
+
+---
+
+still doesnt work. remove the temp code ill look myself
+
+---
+
+found the issue: the statusbar is covering the bottom line... make sure the statusbar is properly UNDER the entire textarea
+
+---
+
+go ahead and revert back to height:auto
