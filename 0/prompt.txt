@@ -1,0 +1,117 @@
+I'm trying to set up my obsidian mcp server-client system. i got this error on the authentication step:
+python app.py 
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/ucak/projects/llm-tui/app.py", line 50, in <module>
+  |     main()
+  |   File "/home/ucak/projects/llm-tui/app.py", line 46, in main
+  |     asyncio.run(main_async())
+  |   File "/usr/lib64/python3.12/asyncio/runners.py", line 195, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/asyncio/runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/app.py", line 34, in main_async
+  |     agent = await build_agent(model, memory)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/llmtui/agent.py", line 46, in build_agent
+  |     mcp_tools = await get_mcp_tools()
+  |                 ^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/llmtui/tools/mcp.py", line 19, in get_mcp_tools
+  |     return await client.get_tools()
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/client.py", line 213, in get_tools
+  |     tools_list = await asyncio.gather(*load_mcp_tool_tasks)
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/tools.py", line 590, in load_mcp_tools
+  |     async with create_session(
+  |                ^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/sessions.py", line 455, in create_session
+  |     async with _create_streamable_http_session(**params) as session:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/sessions.py", line 360, in _create_streamable_http_session
+  |     streamable_http_client(
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 647, in streamable_http_client
+  |     async with anyio.create_task_group() as tg:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/anyio/_backends/_asyncio.py", line 815, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    |     yield
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 394, in handle_async_request
+    |     resp = await self._pool.handle_async_request(req)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    |     raise exc from None
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    |     response = await connection.handle_async_request(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+    |     raise exc
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+    |     stream = await self._connect(request)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 156, in _connect
+    |     stream = await stream.start_tls(**kwargs)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_backends/anyio.py", line 67, in start_tls
+    |     with map_exceptions(exc_map):
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    |     raise to_exc(exc) from exc
+    | httpcore.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:998)
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/anyio/_core/_tasks.py", line 275, in _run_coro
+    |     retval = await self._coro
+    |              ^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 565, in handle_request_async
+    |     await self._handle_post_request(ctx)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 340, in _handle_post_request
+    |     async with ctx.client.stream(
+    |                ^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 210, in __aenter__
+    |     return await anext(self.gen)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1583, in stream
+    |     response = await self.send(
+    |                ^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1629, in send
+    |     response = await self._send_handling_auth(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1657, in _send_handling_auth
+    |     response = await self._send_handling_redirects(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1694, in _send_handling_redirects
+    |     response = await self._send_single_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1730, in _send_single_request
+    |     response = await transport.handle_async_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 393, in handle_async_request
+    |     with map_httpcore_exceptions():
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    |     raise mapped_exc(message) from exc
+    | httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:998)
+    +-----------------------------------
+
+client is created in mcp.py, and loaded in build_agent
