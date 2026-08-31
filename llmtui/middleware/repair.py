@@ -47,6 +47,23 @@ def _extract_objects(args: str) -> list[dict]:
     return objects
 
 
+def _rebuilt(message: AIMessage, blocks: list, tool_calls: list) -> AIMessage:
+    """The model's own message with its content swapped out, metadata and all.
+
+    model_copy rather than AIMessage(...), because ChatOllama only unpacks v1
+    content blocks -- reasoning, tool_call -- on a message whose
+    response_metadata says output_version is v1. A freshly built message has no
+    metadata, so those blocks reach the request raw and Ollama rejects them.
+    """
+
+    return message.model_copy(update={
+        "content": blocks,
+        "tool_calls": tool_calls,
+        # by here every invalid call has been either repaired or reported
+        "invalid_tool_calls": [],
+    })
+
+
 def _repair_attempts(messages: list) -> int:
     """Count repair hand-backs already made this turn.
 
@@ -84,8 +101,7 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
         return None
 
     # every tool is repaired the same way. the model runs several calls
-    # together into one argument string whatever it is calling, so the MCP
-    # tools hit this exactly as search_books does
+    # together into one argument string whatever it is calling
     broken = list(message.invalid_tool_calls)
 
     # decouple the dicts into multiple legal tool calls. a call whose arguments
@@ -148,12 +164,8 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
             print(f"[REPAIR] {len(unrepairable)} call(s) could not be recovered, reported to the model")
         return {
             "messages": [
-                AIMessage(
-                    content=blocks,
-                    # any calls the model got right are kept alongside the repairs
-                    tool_calls=list(message.tool_calls) + recovered,
-                    id=message.id,
-                ),
+                # any calls the model got right are kept alongside the repairs
+                _rebuilt(message, blocks, list(message.tool_calls) + recovered),
                 # ToolMessage reports back to the ai for the dropped tools
                 *[dropped_notice(call) for call in unrepairable],
             ]
@@ -167,7 +179,7 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
         print(f"[REPAIR] gave up after repeated malformed tool calls, {len(unrepairable)} dropped")
         return {
             "messages": [
-                AIMessage(content=blocks, id=message.id),
+                _rebuilt(message, blocks, []),
                 # ToolMessage reports back to the ai for the dropped tools
                 *[dropped_notice(call) for call in unrepairable],
             ]
@@ -190,6 +202,6 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
         ))
 
     return {
-        "messages": [AIMessage(content=blocks, id=message.id)] + handbacks,
+        "messages": [_rebuilt(message, blocks, [])] + handbacks,
         "jump_to": "model",
     }

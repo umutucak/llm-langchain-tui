@@ -9,6 +9,7 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain.agents import create_agent
 from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 from langchain.tools import tool
+from langchain_ollama.chat_models import ChatOllama
 
 from llmtui.middleware import repair_tool_calls, route_tool_error
 
@@ -36,12 +37,19 @@ class ScriptedModel(BaseChatModel):
         return self
 
 
+# what ChatOllama stamps on everything it returns. ChatOllama only unpacks v1
+# content blocks on a message carrying this, so a fixture without it cannot
+# catch a middleware that rebuilds a message and loses it
+V1_META = {"model_provider": "ollama", "output_version": "v1"}
+
+
 def ai_invalid(args, name="search_books", cid=None):
     cid = cid or str(uuid.uuid4())
     m = AIMessage(
         content=[{"type": "reasoning", "reasoning": "thinking", "index": 0},
                  {"type": "invalid_tool_call", "id": cid, "name": name,
                   "args": args, "error": "Failed to parse tool call arguments as JSON"}],
+        response_metadata=dict(V1_META),
         id=str(uuid.uuid4()))
     m.invalid_tool_calls = [{"name": name, "args": args, "id": cid,
                              "error": "Failed to parse tool call arguments as JSON",
@@ -56,7 +64,8 @@ def ai_valid(calls):
         cid = str(uuid.uuid4())
         tcs.append({"name": name, "args": args, "id": cid, "type": "tool_call"})
         blocks.append({"type": "tool_call", "id": cid, "name": name, "args": args})
-    return AIMessage(content=blocks, tool_calls=tcs, id=str(uuid.uuid4()))
+    return AIMessage(content=blocks, tool_calls=tcs,
+                     response_metadata=dict(V1_META), id=str(uuid.uuid4()))
 
 
 def ai_invalid_many(argstrings, name="search_books"):
@@ -70,13 +79,15 @@ def ai_invalid_many(argstrings, name="search_books"):
         invalid.append({"name": name, "args": args, "id": cid,
                         "error": "Failed to parse tool call arguments as JSON",
                         "type": "invalid_tool_call"})
-    m = AIMessage(content=blocks, id=str(uuid.uuid4()))
+    m = AIMessage(content=blocks, response_metadata=dict(V1_META),
+                  id=str(uuid.uuid4()))
     m.invalid_tool_calls = invalid
     return m
 
 
 def ai_text(text):
-    return AIMessage(content=[{"type": "text", "text": text}], id=str(uuid.uuid4()))
+    return AIMessage(content=[{"type": "text", "text": text}],
+                     response_metadata=dict(V1_META), id=str(uuid.uuid4()))
 
 
 CALLS = []
@@ -293,6 +304,33 @@ results["9 mcp repair"] = run(
              for b in m.content if isinstance(b, dict))),
         ("the turn reached an answer instead of ending early",
          r["messages"][-1].content[0].get("type") == "text"),
+    ])
+
+# ---- 10. the repaired message can still be sent back to ollama ----
+# ChatOllama only unpacks v1 blocks -- reasoning, tool_call -- on a message
+# whose response_metadata says output_version is v1. rebuilding the message
+# from scratch dropped that, so the repair worked and then the next model call
+# died on "Unsupported message content type"
+def converts(result) -> bool:
+    """Would ChatOllama accept this history on the next model call?"""
+
+    try:
+        ChatOllama(model="qwen3.8:27b")._convert_messages_to_ollama_messages(
+            result["messages"])
+        return True
+    except ValueError as exc:
+        print(f"    converter rejected the history: {exc}")
+        return False
+
+
+agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
+results["10 ollama accepts repair"] = run(
+    "CASE 10  the repaired message is still sendable to ollama", agent,
+    lambda r: [
+        ("the repaired message kept the model's own metadata",
+         all(m.response_metadata.get("output_version") == "v1"
+             for m in r["messages"] if isinstance(m, AIMessage))),
+        ("the whole history converts for the next model call", converts(r)),
     ])
 
 print("\n" + "="*70)

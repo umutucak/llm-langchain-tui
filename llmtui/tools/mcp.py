@@ -47,6 +47,22 @@ MCP_SERVERS: dict = {
     }
 }
 
+# tools a server offers but we never hand to the model. every name on the menu
+# is one more it can reach for by mistake, and a 27b model picking between
+# sixteen of them picks wrong often enough to lose a turn to it
+WHITELISTED_TOOLS: set[str] = {
+    "vault_list",
+    "vault_read",
+    "vault_write",
+    "vault_append",
+    "vault_patch",
+    "vault_delete",
+    "vault_move",
+    "vault_get_document_map",
+    "search_simple",
+    "open_file"
+}
+
 
 def _reason(exc: BaseException, dropped: bool = False) -> str:
     """The shortest honest account of why a server did not answer.
@@ -135,7 +151,8 @@ async def get_mcp_tools(status: MCPStatus) -> list[BaseTool]:
 
     for name in MCP_SERVERS:
         try:
-            tools.extend(await client.get_tools(server_name=name))
+            loaded = await client.get_tools(server_name=name)
+            tools.extend(t for t in loaded if t.name in WHITELISTED_TOOLS)
             status.mark_up(name)
         except Exception as exc:
             status.mark_down(name, _reason(exc))
