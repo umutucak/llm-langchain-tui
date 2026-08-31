@@ -36,6 +36,33 @@ from llmtui.tools.mcp import MCPStatus
 SPINNER: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 # how many blocks wide the context meter is drawn
 METER_WIDTH: int = 8
+# most a tool row will put on screen. the row is a preview, and an auto-height
+# Static holding a whole note re-lays the log out every time it is opened
+ROW_PREVIEW_CHARS: int = 4000
+
+
+def tool_text(content) -> str:
+    """The text a tool returned, out of whichever shape it came back in.
+
+    Local tools return a string. MCP tools return a list of content blocks, and
+    str() on that gives a python repr -- newlines escaped, so the whole result
+    lands on one line and wrapping it is what locks the screen up.
+    """
+
+    if isinstance(content, list):
+        return "\n".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content or "")
+
+
+def preview(text: str) -> str:
+    """Enough of a tool result to read, without the rest of it on screen."""
+
+    if len(text) <= ROW_PREVIEW_CHARS:
+        return text
+    return f"{text[:ROW_PREVIEW_CHARS]}\n\n… {len(text) - ROW_PREVIEW_CHARS} more characters"
 
 
 def meter(used: int, total: int) -> str:
@@ -115,7 +142,7 @@ class ToolRow(Collapsible):
         # it, and ToolErrorMiddleware catches search failures first and hands back
         # a ToolMessage with status="error" instead. the repair middleware's
         # dropped-call notices arrive the same way
-        text = str(getattr(output, "content", output) or "")
+        text = tool_text(getattr(output, "content", output))
         failed = error is not None or getattr(output, "status", None) == "error"
 
         if failed:
@@ -128,7 +155,7 @@ class ToolRow(Collapsible):
             # a ToolMessage with no exception is how the repair middleware reports
             # a dropped call. on_search_error's guidance is deliberately not shown
             # here -- it is instruction written for the model, not for the reader
-            self._body.update(str(error) if error is not None else text)
+            self._body.update(preview(str(error) if error is not None else text))
             return
 
         # search_books joins its passages with this separator, so splitting on it
@@ -137,7 +164,7 @@ class ToolRow(Collapsible):
         self.add_class("-ok")
         plural = "" if len(passages) == 1 else "s"
         self.title = self._row_title("✓", f"{len(passages)} passage{plural}{when}")
-        self._body.update(text or "(nothing returned)")
+        self._body.update(preview(text) or "(nothing returned)")
 
 
 class AssistantTurn(Vertical):

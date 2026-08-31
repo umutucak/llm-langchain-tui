@@ -26,7 +26,8 @@ from textual.widgets import Collapsible, Markdown, SelectionList, Static
 from llmtui.middleware import route_tool_error
 from llmtui.tools.mcp import MCPStatus
 from llmtui.tui import (
-    AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar, ToolRow, compact, meter,
+    ROW_PREVIEW_CHARS, AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar,
+    ToolRow, compact, meter,
 )
 
 
@@ -901,7 +902,54 @@ async def case_build_agent():
     ])
 
 
+# ---- 18. an MCP result is text, not a repr of its content blocks ----
+async def case_mcp_row_body():
+    # MCP tools answer with a list of content blocks. str() on that gives a
+    # python repr with the newlines escaped, so a long note arrived as one
+    # 26k-character line and opening the row locked the screen up
+    @tool(response_format="content_and_artifact")
+    async def vault_read(path: str):
+        """Read a vault note."""
+        note = "\n".join(f"line {i} of a very long note" for i in range(600))
+        return [{"type": "text", "text": note, "id": "lc_test"}], None
+
+    connection = sqlite3.connect(":memory:", check_same_thread=False)
+    connection.execute("CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, title TEXT,"
+                       " created_at TEXT, updated_at TEXT)")
+    agent = create_agent(
+        model=ScriptedModel(responses=[
+            ai_calls([("vault_read", {"path": "Places/Somewhere.md"})]),
+            ai_text("Read the note."),
+        ]),
+        tools=[vault_read],
+        checkpointer=MemorySaver(),
+    )
+    app = LlmTui(agent, None, connection,
+                 {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
+
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "read my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        rows = list(app.query(ToolRow))
+        body = str(rows[0]._body.content) if rows else ""
+        longest = max((len(line) for line in body.split("\n")), default=0)
+
+        check("18  a long MCP result renders as text, capped", [
+            ("the row resolved", rows and rows[0].has_class("-ok")),
+            ("the note's own text is shown", "line 0 of a very long note" in body),
+            ("no content-block repr leaked in", "'type': 'text'" not in body),
+            ("newlines survived, so nothing is one huge line", longest < 100),
+            ("body capped near the preview limit",
+             len(body) <= ROW_PREVIEW_CHARS + 80),
+            ("the reader is told what was withheld", "more characters" in body),
+        ])
+
+
 async def main():
+    await case_mcp_row_body()
     await case_build_agent()
     await case_mcp_degrades()
     await case_mcp_live_status()
