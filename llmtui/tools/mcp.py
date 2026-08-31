@@ -47,9 +47,9 @@ MCP_SERVERS: dict = {
     }
 }
 
-# tools a server offers but we never hand to the model. every name on the menu
-# is one more it can reach for by mistake, and a 27b model picking between
-# sixteen of them picks wrong often enough to lose a turn to it
+# ditched a bunch of the tools from
+# https://coddingtonbear.github.io/obsidian-local-rest-api/#/paths/mcp/post
+# i dont have use for them
 WHITELISTED_TOOLS: set[str] = {
     "vault_list",
     "vault_read",
@@ -58,6 +58,7 @@ WHITELISTED_TOOLS: set[str] = {
     "vault_patch",
     "vault_delete",
     "vault_move",
+    "vault_copy",
     "vault_get_document_map",
     "search_simple",
     "open_file"
