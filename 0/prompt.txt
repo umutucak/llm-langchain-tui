@@ -1,0 +1,10 @@
+continue
+
+---
+
+1) I added vault_copy back
+2) you can do the rewrite
+
+---
+
+did the incorrect retrieval success reporting affect the model behaviour? or was it purely frontend?
