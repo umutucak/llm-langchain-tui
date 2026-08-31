@@ -74,8 +74,8 @@ def book_pattern(book: str) -> str:
     return "%" + re.sub(r"[\s_-]+", "%", cleaned) + "%"
 
 
-@tool
-def search_books(query: str, book: str = "") -> str:
+@tool(response_format="content_and_artifact")
+def search_books(query: str, book: str = "") -> tuple[str, dict]:
     """Search the ingested document corpus for passages relevant to the query.
     Use this for questions about roleplaying games, their rules, and anything
     else that would be mentioned in their books.
@@ -92,6 +92,10 @@ def search_books(query: str, book: str = "") -> str:
             book title in here, use the book argument for that.
         book: Optional. Part of a book's filename, to restrict the search to
             that book. Leave empty to search the whole library.
+
+    Returns the passages and, alongside them, how many there were. The count
+    goes in the artifact rather than the text, so the tool row can show that a
+    search came back empty without that number reaching the model.
     """
 
     # clean the arg from query chars. milvus uses its own expression language
@@ -120,13 +124,13 @@ def search_books(query: str, book: str = "") -> str:
                 f"the user; ask them for the book's exact title only if you "
                 f"think the name was the problem. "
                 f"Do not answer from general knowledge."
-            )
+            ), {"passages": 0}
         return (
             "No passages matched anywhere in the document library. If you have "
             "already tried a different phrasing of this search, stop here and "
             "tell the user the library does not appear to cover it. "
             "Do not answer from general knowledge."
-        )
+        ), {"passages": 0}
 
     # alongside the matched chunk, send metadata like the book title, page number
     formatted = []
@@ -135,4 +139,4 @@ def search_books(query: str, book: str = "") -> str:
         page = doc.metadata.get("page", "?")
         formatted.append(f"[{source} p.{page}]\n{doc.page_content}")
 
-    return "\n\n---\n\n".join(formatted)
+    return "\n\n---\n\n".join(formatted), {"passages": len(results)}

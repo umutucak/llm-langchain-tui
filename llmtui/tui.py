@@ -158,12 +158,23 @@ class ToolRow(Collapsible):
             self._body.update(preview(str(error) if error is not None else text))
             return
 
-        # search_books joins its passages with this separator, so splitting on it
-        # gets the count back without the tool having to report one
-        passages = text.split("\n\n---\n\n") if text.strip() else []
-        self.add_class("-ok")
-        plural = "" if len(passages) == 1 else "s"
-        self.title = self._row_title("✓", f"{len(passages)} passage{plural}{when}")
+        # a search that matched nothing is not a failure, so it arrives here
+        # looking like any other answer. search_books puts its count in the
+        # artifact, which is the only way to tell the two apart -- a tool that
+        # reports no count gets its size instead of an invented passage figure
+        passages = (getattr(output, "artifact", None) or {}).get("passages")
+
+        if passages == 0:
+            self.add_class("-empty")
+            self.title = self._row_title("∅", f"no passages{when}")
+        elif passages is not None:
+            self.add_class("-ok")
+            plural = "" if passages == 1 else "s"
+            self.title = self._row_title("✓", f"{passages} passage{plural}{when}")
+        else:
+            self.add_class("-ok")
+            self.title = self._row_title("✓", f"{compact(len(text))} chars{when}")
+
         self._body.update(preview(text) or "(nothing returned)")
 
 

@@ -101,6 +101,8 @@ Screen {
 
 .toolrow.-running CollapsibleTitle { color: $warning; }
 .toolrow.-ok      CollapsibleTitle { color: $success; }
+/* the search ran and found nothing -- a miss, not a fault */
+.toolrow.-empty   CollapsibleTitle { color: $warning; }
 .toolrow.-error   CollapsibleTitle { color: $error; }
 
 .passages {
