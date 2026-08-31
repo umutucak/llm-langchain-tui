@@ -58,11 +58,15 @@ def ai_text(text):
     return AIMessage(content=[{"type": "text", "text": text}], id=str(uuid.uuid4()))
 
 
-@tool
-async def search_books(query: str, book: str = "") -> str:
+# content_and_artifact like the real one: the passage count rides beside the
+# text, because that is the only thing telling an empty search from a full one
+@tool(response_format="content_and_artifact")
+async def search_books(query: str, book: str = "") -> tuple[str, dict]:
     """Search the book library."""
     await asyncio.sleep(0.02)
-    return f"[core.pdf p.1]\nPassage about {query}\n\n---\n\n[core.pdf p.2]\nMore about {query}"
+    text = (f"[core.pdf p.1]\nPassage about {query}\n\n---\n\n"
+            f"[core.pdf p.2]\nMore about {query}")
+    return text, {"passages": 2}
 
 
 def build_app(responses):
@@ -939,6 +943,9 @@ async def case_mcp_row_body():
 
         check("18  a long MCP result renders as text, capped", [
             ("the row resolved", rows and rows[0].has_class("-ok")),
+            # an MCP tool reports no passage count, so the row shows size
+            ("no passage count invented for a tool that reports none",
+             "passage" not in str(rows[0].title) if rows else False),
             ("the note's own text is shown", "line 0 of a very long note" in body),
             ("no content-block repr leaked in", "'type': 'text'" not in body),
             ("newlines survived, so nothing is one huge line", longest < 100),
@@ -948,7 +955,51 @@ async def case_mcp_row_body():
         ])
 
 
+# ---- 19. a search that matched nothing does not read as a success ----
+async def case_empty_search():
+    # search_books answers a miss with guidance text and no passages, which is
+    # a perfectly successful call. counting separators in that text used to
+    # score it as "1 passage" behind a green tick
+    @tool(response_format="content_and_artifact")
+    async def search_books(query: str, book: str = "") -> tuple[str, dict]:
+        """Search the book library."""
+        return "No passages matched anywhere in the document library.", {"passages": 0}
+
+    connection = sqlite3.connect(":memory:", check_same_thread=False)
+    connection.execute("CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, title TEXT,"
+                       " created_at TEXT, updated_at TEXT)")
+    agent = create_agent(
+        model=ScriptedModel(responses=[
+            ai_calls([("search_books", {"query": "a topic no book covers"})]),
+            ai_text("The library does not cover that."),
+        ]),
+        tools=[search_books],
+        checkpointer=MemorySaver(),
+    )
+    app = LlmTui(agent, None, connection,
+                 {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
+
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "something obscure"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        rows = list(app.query(ToolRow))
+        title = str(rows[0].title) if rows else ""
+
+        check("19  an empty search reads as a miss, not a success", [
+            ("the row is not marked ok", rows and not rows[0].has_class("-ok")),
+            ("it is marked empty", rows and rows[0].has_class("-empty")),
+            ("but it is not an error either", rows and not rows[0].has_class("-error")),
+            ("the title says so", "no passages" in title),
+            ("no invented passage count", "1 passage" not in title),
+            ("the run still answered", len(list(app.query(Markdown))) == 1),
+        ])
+
+
 async def main():
+    await case_empty_search()
     await case_mcp_row_body()
     await case_build_agent()
     await case_mcp_degrades()
