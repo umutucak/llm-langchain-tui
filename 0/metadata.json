@@ -1,0 +1,277 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M1C1WQC2ZEQXJ9CTCVDZHSHS",
+  "session_id": "c2fbfe44-92f1-4b59-a8c2-0cf3c33e7c6e",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-31T13:59:43.98989388Z",
+  "branch": "obsidian-mcp",
+  "checkpoints_count": 13,
+  "save_step_count": 13,
+  "files_touched": [
+    "app.py",
+    "llmtui/agent.py",
+    "llmtui/middleware/__init__.py",
+    "llmtui/middleware/errors.py",
+    "llmtui/tools/mcp.py",
+    "llmtui/tui.py",
+    "tests/test_middleware.py",
+    "tests/test_tui.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "643d32440bc5",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 1892,
+    "cache_creation_tokens": 5774534,
+    "cache_read_tokens": 255914210,
+    "output_tokens": 1032966,
+    "api_call_count": 946
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_012MDLDrV5jYCxqky6ikenna",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "643d32440bc5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 7,
+        "end": 8,
+        "entry_ids": [
+          "08d461c0-d832-49ff-8fb3-0f98d95969d1"
+        ],
+        "tool_use_id": "toolu_012MDLDrV5jYCxqky6ikenna"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_012MDLDrV5jYCxqky6ikenna"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-api",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01V9i4dhzB3WrsMP6z6QSKTT",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "643d32440bc5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 960,
+        "end": 961,
+        "entry_ids": [
+          "2897c733-1799-426d-ace6-ed3bce1ef055"
+        ],
+        "tool_use_id": "toolu_01V9i4dhzB3WrsMP6z6QSKTT"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01V9i4dhzB3WrsMP6z6QSKTT"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-design",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01SzkJ8h7NAVVrkcmPHQWwys",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "643d32440bc5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 1514,
+        "end": 1515,
+        "entry_ids": [
+          "d34398eb-636e-45da-ad6a-a38e1162b9be"
+        ],
+        "tool_use_id": "toolu_01SzkJ8h7NAVVrkcmPHQWwys"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01SzkJ8h7NAVVrkcmPHQWwys"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-design",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Qq7WQ5wSJXAsuthEwrdrSH",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-diagramming"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "643d32440bc5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 2584,
+        "end": 2585,
+        "entry_ids": [
+          "a6d158b3-2a8c-483f-8b61-35eb54a25c9e"
+        ],
+        "tool_use_id": "toolu_01Qq7WQ5wSJXAsuthEwrdrSH"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Qq7WQ5wSJXAsuthEwrdrSH"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: artifact-diagramming",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 26
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-31T13:59:43.360367189Z",
+    "agent_lines": 225,
+    "agent_removed": 0,
+    "human_added": 126,
+    "human_modified": 79,
+    "human_removed": 0,
+    "total_committed": 415,
+    "total_lines_changed": 430,
+    "agent_percentage": 52.32558139534884,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 118,
+      "agent_lines_removed": 22
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 273,
+      "agent_lines_removed": 32
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 273,
+      "agent_lines_removed": 32
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 316,
+      "agent_lines_removed": 32
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 316,
+      "agent_lines_removed": 32
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 316,
+      "agent_lines_removed": 32
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 72,
+      "user_lines_removed": 21,
+      "agent_lines_added": 316,
+      "agent_lines_removed": 32,
+      "user_added_per_file": {
+        "app.py": 5,
+        "llmtui/tools/mcp.py": 66,
+        "llmtui/tui.py": 1
+      },
+      "user_removed_per_file": {
+        "app.py": 2,
+        "llmtui/tools/mcp.py": 18,
+        "llmtui/tui.py": 1
+      }
+    },
+    {
+      "checkpoint_number": 10,
+      "user_lines_added": 108,
+      "user_lines_removed": 20,
+      "agent_lines_added": 365,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "llmtui/tui.py": 13,
+        "tests/test_tui.py": 95
+      },
+      "user_removed_per_file": {
+        "llmtui/tui.py": 9,
+        "tests/test_tui.py": 11
+      }
+    },
+    {
+      "checkpoint_number": 11,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 459,
+      "agent_lines_removed": 36
+    },
+    {
+      "checkpoint_number": 12,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 459,
+      "agent_lines_removed": 36
+    },
+    {
+      "checkpoint_number": 13,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 459,
+      "agent_lines_removed": 36
+    }
+  ]
+}

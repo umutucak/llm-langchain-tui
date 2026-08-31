@@ -1,0 +1,185 @@
+I'm trying to set up my obsidian mcp server-client system. i got this error on the authentication step:
+python app.py 
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/ucak/projects/llm-tui/app.py", line 50, in <module>
+  |     main()
+  |   File "/home/ucak/projects/llm-tui/app.py", line 46, in main
+  |     asyncio.run(main_async())
+  |   File "/usr/lib64/python3.12/asyncio/runners.py", line 195, in run
+  |     return runner.run(main)
+  |            ^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/asyncio/runners.py", line 118, in run
+  |     return self._loop.run_until_complete(task)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+  |     return future.result()
+  |            ^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/app.py", line 34, in main_async
+  |     agent = await build_agent(model, memory)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/llmtui/agent.py", line 46, in build_agent
+  |     mcp_tools = await get_mcp_tools()
+  |                 ^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/llmtui/tools/mcp.py", line 19, in get_mcp_tools
+  |     return await client.get_tools()
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/client.py", line 213, in get_tools
+  |     tools_list = await asyncio.gather(*load_mcp_tool_tasks)
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/tools.py", line 590, in load_mcp_tools
+  |     async with create_session(
+  |                ^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/sessions.py", line 455, in create_session
+  |     async with _create_streamable_http_session(**params) as session:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/langchain_mcp_adapters/sessions.py", line 360, in _create_streamable_http_session
+  |     streamable_http_client(
+  |   File "/usr/lib64/python3.12/contextlib.py", line 231, in __aexit__
+  |     await self.gen.athrow(value)
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 647, in streamable_http_client
+  |     async with anyio.create_task_group() as tg:
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/anyio/_backends/_asyncio.py", line 815, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    |     yield
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 394, in handle_async_request
+    |     resp = await self._pool.handle_async_request(req)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    |     raise exc from None
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    |     response = await connection.handle_async_request(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+    |     raise exc
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+    |     stream = await self._connect(request)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_async/connection.py", line 156, in _connect
+    |     stream = await stream.start_tls(**kwargs)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_backends/anyio.py", line 67, in start_tls
+    |     with map_exceptions(exc_map):
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    |     raise to_exc(exc) from exc
+    | httpcore.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:998)
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/anyio/_core/_tasks.py", line 275, in _run_coro
+    |     retval = await self._coro
+    |              ^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 565, in handle_request_async
+    |     await self._handle_post_request(ctx)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/mcp/client/streamable_http.py", line 340, in _handle_post_request
+    |     async with ctx.client.stream(
+    |                ^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 210, in __aenter__
+    |     return await anext(self.gen)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1583, in stream
+    |     response = await self.send(
+    |                ^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1629, in send
+    |     response = await self._send_handling_auth(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1657, in _send_handling_auth
+    |     response = await self._send_handling_redirects(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1694, in _send_handling_redirects
+    |     response = await self._send_single_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_client.py", line 1730, in _send_single_request
+    |     response = await transport.handle_async_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 393, in handle_async_request
+    |     with map_httpcore_exceptions():
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/lib64/python3.12/contextlib.py", line 158, in __exit__
+    |     self.gen.throw(value)
+    |   File "/home/ucak/projects/llm-tui/.venv/lib64/python3.12/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    |     raise mapped_exc(message) from exc
+    | httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:998)
+    +-----------------------------------
+
+client is created in mcp.py, and loaded in build_agent
+
+---
+
+when obsidian isn't running, the program crashes on launch. propose a graceful way to check if obsidian is running on launch, and maybe (re)connect at run-time
+
+---
+
+1) return and catch error instead of raising and stopping
+2) statusbar mcp declaration: say which mcp servers you are connected to. could this be something collapsable to fit many names under a single 'mcp' button?
+2) don't worry about hotswapping mcps at runtime for now
+
+---
+
+good. fix build_agent return type, get mcp tools in app, and pass them as a paramters to build_agent
+
+---
+
+was your previous implementation cleaner?
+
+---
+
+yeah put it back. but write SHORT and CLEAR documentation for why its like that. not too verbose
+
+---
+
+the "dropping connection at runtime" error is caught properly by the middleware, but the statusbar is not updated. think about how this change could be displayed with minimal spaghetti wiring, and pitch me an idea
+
+---
+
+Proceed. But first, tell me about the different failstates (never making a connection vs failing tool call after dropping connection) For example: if we make a good initial connection, then drop it, make a tool call, fail, pick up the connection again, make a tool call, succeed?
+
+---
+
+elaborate on quirk 2
+
+---
+
+Go ahead and build
+
+---
+
+what problem does this fallback solve?
+
+---
+
+you are designing the functions around the test cases. dont do that, do the test cases around the function. here is the plan: make it mandadory to pass an mcp, finish wrapping up our statusbar updating system. and then make the modifications on the test units
+
+---
+
+that was me, i shut it down
+
+---
+
+Before tackling that, I want to wrap about all of the MCP fixes we implemented and commit. Do a project wide check to check if we have implemented our requirements:
+1) gracefully handle MCP server errors
+2) show mcp status live in the statusbar
+
+---
+
+rename "McpStatus" to "MCPStatus" everywhere
+
+---
+
+do we still need to give on_search_error and _on_mcp_error to the file i attached? we are routing these functions through route_tool_errer now, no?
+
+---
+
+reminder: always implementation for production, not for testing. take the clean approach. drop what is not used in the code, and fix the test units to use routing

@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.10.2",
+  "checkpoint_id": "01M1C1WQC2ZEQXJ9CTCVDZHSHS",
+  "strategy": "manual-commit",
+  "branch": "obsidian-mcp",
+  "checkpoints_count": 13,
+  "files_touched": [
+    "app.py",
+    "llmtui/agent.py",
+    "llmtui/middleware/__init__.py",
+    "llmtui/middleware/errors.py",
+    "llmtui/tools/mcp.py",
+    "llmtui/tui.py",
+    "tests/test_middleware.py",
+    "tests/test_tui.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1892,
+    "cache_creation_tokens": 5774534,
+    "cache_read_tokens": 255914210,
+    "output_tokens": 1032966,
+    "api_call_count": 946
+  }
+}
