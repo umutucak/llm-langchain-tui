@@ -1,4 +1,5 @@
 import os
+import re
 
 from langchain.tools import tool
 from langchain_ollama.embeddings import OllamaEmbeddings
@@ -57,6 +58,22 @@ reranker = Function(
 )
 
 
+def book_pattern(book: str) -> str:
+    """A `like` pattern matching a filename however the model spelled the title.
+
+    Filenames are underscore-separated, but the model writes titles with spaces
+    about as often, so every run of separators becomes a wildcard: "against the
+    cult" and "against_the_cult" both find
+    n1_against_the_cult_of_the_reptile_god.pdf.
+
+    Quotes and backslashes would break out of the expression, and % is the
+    wildcard itself, so those three go.
+    """
+
+    cleaned = re.sub(r'["\\%]', "", book).strip()
+    return "%" + re.sub(r"[\s_-]+", "%", cleaned) + "%"
+
+
 @tool
 def search_books(query: str, book: str = "") -> str:
     """Search the ingested document corpus for passages relevant to the query.
@@ -78,15 +95,15 @@ def search_books(query: str, book: str = "") -> str:
     """
 
     # clean the arg from query chars. milvus uses its own expression language
-    book = book.replace('"', "").replace("\\", "").replace("%", "").replace("_", "").strip()
+    book = book.strip()
 
     # Note: the hybrid search guide https://milvus.io/docs/milvus_hybrid_search_retriever.md#Specify-the-index-params-for-multi-vector-fields
     # says to use the "ranker_type" parameter, but i got deprecation warnings, so i used this custom function as per the warning 
     kwargs = {"k": TOP_K, "fetch_k": FETCH_K, "reranker": reranker}
 
-    # we send an extra filter. 
+    # we send an extra filter.
     if book:
-        kwargs["expr"] = f'source like "%{book}%"'
+        kwargs["expr"] = f'source like "{book_pattern(book)}"'
 
     # hybrid search using dense semantic similarity + bm25 sparse search merged and reranked with rrf
     results = vector_store.similarity_search(query, **kwargs)
