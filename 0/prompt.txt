@@ -1,0 +1,69 @@
+how does _rebuilt interact with search_books
+
+---
+
+Ok so this had a bunch of bugs bundled with it.
+
+---
+
+1) we will get back to that
+2) that's fine. that is more behavioural than logical, and i will see as i use it to see how to make the experience better
+3) tell me more
+
+---
+
+I do not understand the issue. Tell me what changes you propose for what problem.
+
+---
+
+you said "The model emits one message containing two tool calls:
+
+
+search_books({"query": "grappling"})     ← fine
+search_books('{"query": "grap')          ← truncated, unparseable
+_extract_objects gets nothing out of the second one,"
+
+how come it does not return the first as a good object, which then is appended to recovered
+
+---
+
+ok, confirm my understanding: if we have multiple separate tool calls, and if one of them is invalid or if we run out of repair attempts (which is what we ran into i believe) instead of letting the good calls stay alive, we call full quits, declare zero tool returns, and hand it back to the model?
+
+---
+
+can we confirm that a complete set of malformed tool calls were made?
+
+---
+
+I am running some tests where I actually use all of the tools together. The abrupt endings are over, even though we did not implement any fixes since the "_rebuilt" function. So that's nice?
+
+However, some more operational problems: The model keeps using the wrong tools. It searches in the obsidian vault what should be searched in books, and the other way around. It is also failing to use some of the tools altogether, in its reasoning block it keeps declaring that there is something wrong in the harness.
+
+---
+
+1) i changed .env
+2) Do not load command_execute command_list tag_list _search_query active_file_get_path. The rest i have uses for. 
+3) update the system prompt accordingly
+
+---
+
+I have very long files. I need these files to be chunked better. Most of my material is properly organized markdowns with headings that can be used to chunk the content. But the MPC server does not expose a trivial tool for this use case. How do we load only smaller chunks of headings to the context?
+
+---
+
+My textual frontend keeps freezing and breaking when i open a relatively larger tool call response
+
+---
+
+I attached a context inspection report. Here is an extended conversation where the agent researched my vault, different books, and wrote things in. Observe, analyse, and see if everything looks as we intended.
+
+---
+
+1) apply the book filter so that it can catch "against the cult of the reptile god" and "against_the_cult_of_the_reptile_god" both
+2) We can come back to this later
+3) What exactly is the problem here?
+
+---
+
+1) confirmed and understood
+3) how do you propose the error should be thrown
