@@ -3,6 +3,8 @@
 from langchain.agents import create_agent
 from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 
+from langchain_core.tools.base import BaseTool
+
 from langchain_ollama.chat_models import ChatOllama
 
 from langgraph.graph.state import CompiledStateGraph
@@ -18,9 +20,8 @@ from llmtui.config import (
     TOP_K,
     TOP_P,
 )
-from llmtui.middleware import on_search_error, repair_tool_calls
+from llmtui.middleware import repair_tool_calls, route_tool_error
 from llmtui.tools import TOOLS
-from llmtui.tools.mcp import get_mcp_tools
 
 with open(SYSTEM_PROMPT_PATH, 'r') as f:
     SYSTEM_PROMPT: str = f.read()
@@ -42,8 +43,14 @@ def build_model() -> ChatOllama:
     )
 
 
-async def build_agent(model: ChatOllama, checkpointer) -> CompiledStateGraph:
-    mcp_tools = await get_mcp_tools()
+def build_agent(
+    model: ChatOllama, checkpointer, mcp_tools: list[BaseTool]
+) -> CompiledStateGraph:
+    """Assemble the graph out of parts. The MCP tools are fetched by the caller.
+    """
+
+    mcp_names = {tool.name for tool in mcp_tools}
+
     return create_agent(
         model=model,
         tools=TOOLS+mcp_tools,
@@ -52,9 +59,11 @@ async def build_agent(model: ChatOllama, checkpointer) -> CompiledStateGraph:
                 tool_name="search_books",
                 run_limit=MAX_TOOL_CALLS
             ),
+            # one middleware for all types tool, so we need a on_error trigger
+            # that can facilitate for all types of errors
             ToolErrorMiddleware(
-                on_error=on_search_error,
-                tools=["search_books"]
+                on_error=route_tool_error(mcp_names),
+                tools=["search_books", *mcp_names]
             ),
             # after_model custom middleware to fix malformed tool calls
             # https://docs.langchain.com/oss/python/langchain/middleware/custom#node-style-hooks

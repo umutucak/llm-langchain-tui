@@ -10,7 +10,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 from langchain.tools import tool
 
-from llmtui.middleware import on_search_error, repair_tool_calls
+from llmtui.middleware import repair_tool_calls, route_tool_error
 
 BAD_CONCAT = ('{"query": "setting of the game", "book": "Heart Beneath the City"}'
               '{"query": "what kind of adventures can you run", "book": "Heart Beneath the City"}')
@@ -94,7 +94,10 @@ def build(responses, raises=False, run_limit=3):
         tools=[search_books],
         middleware=[
             ToolCallLimitMiddleware(tool_name="search_books", run_limit=run_limit),
-            ToolErrorMiddleware(on_error=on_search_error, tools=["search_books"]),
+            # no MCP tools here, so the router falls through to the search
+            # handler for everything -- the same stack build_agent assembles
+            ToolErrorMiddleware(on_error=route_tool_error(set()),
+                                tools=["search_books"]),
             repair_tool_calls,
         ],
     )

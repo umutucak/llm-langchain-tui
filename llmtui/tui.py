@@ -30,6 +30,7 @@ from textual.widgets import (
 from llmtui import config
 from llmtui.naming import name_session_if_unnamed
 from llmtui.sessions import delete_session, list_sessions, set_session_title
+from llmtui.tools.mcp import MCPStatus
 
 
 SPINNER: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -261,14 +262,44 @@ class PromptArea(TextArea):
 
 
 class StatusBar(Static):
-    """State, context pressure and generation speed."""
+    """State, context pressure, generation speed and the MCP servers."""
 
-    def __init__(self) -> None:
+    def __init__(self, mcp_status: MCPStatus) -> None:
         super().__init__(id="status")
         self.state = "ready"
         self.ctx_used = 0
         self.tps = 0.0
         self.elapsed = 0.0
+        # held by reference and read at render time, never copied. the
+        # interceptor in mcp.py writes to this same object as calls fail and
+        # recover, so every repaint shows the current verdict for free
+        self.mcp = mcp_status
+        self.mcp_open = False
+
+    def mcp_segment(self) -> str:
+        """The mcp button: a tally that opens into the roll call when clicked.
+
+        How many servers there are is not known here, and the bar is one row,
+        so the names cannot all live on it permanently. Collapsed it is a count
+        you can read at a glance; clicking swaps in the names, and the ones
+        that failed say why. [@click=...] is Textual's own markup, so this
+        stays one Static rather than becoming a row of widgets.
+        """
+
+        servers = self.mcp.servers
+        live = self.mcp.live
+
+        if not self.mcp_open:
+            colour = "$success" if len(live) == len(servers) else "$error"
+            label = f"mcp [{colour}]{len(live)}/{len(servers)}[/]"
+        else:
+            label = "mcp " + " ".join(
+                f"[$success]{name}[/]" if failed is None
+                else f"[$error]{name} ({failed})[/]"
+                for name, failed in servers.items()
+            )
+
+        return f"[@click=app.toggle_mcp()]{label}[/]"
 
     def refresh_line(self) -> None:
         parts = [f"[b]{self.state}[/b]"]
@@ -281,6 +312,9 @@ class StatusBar(Static):
             parts.append(f"{self.tps:.0f} tok/s")
         if self.elapsed:
             parts.append(f"{self.elapsed:.1f}s")
+        # nothing to say when no servers are configured at all
+        if self.mcp.servers:
+            parts.append(self.mcp_segment())
         parts += ["esc stop", "^q quit", "/help"]
         self.update("  ·  ".join(parts))
 
@@ -398,12 +432,14 @@ class LlmTui(App):
         ("ctrl+l", "clear", "clear transcript"),
     ]
 
-    def __init__(self, agent, model, sqlite_connection, agent_thread_config) -> None:
+    def __init__(self, agent, model, sqlite_connection, agent_thread_config,
+                 mcp_status: MCPStatus) -> None:
         super().__init__()
         self.agent = agent
         self.model = model
         self.sqlite_connection = sqlite_connection
         self.agent_thread_config = agent_thread_config
+        self.mcp_status = mcp_status
         self._turn_started = 0.0
         self._out_chars = 0
 
@@ -418,7 +454,7 @@ class LlmTui(App):
         with Vertical(id="footer"):
             yield PromptArea(placeholder="ask about the library, or /help",
                              soft_wrap=True, highlight_cursor_line=False, id="prompt")
-            yield StatusBar()
+            yield StatusBar(self.mcp_status)
 
     def on_mount(self) -> None:
         self.transcript = self.query_one("#transcript", VerticalScroll)
@@ -718,3 +754,10 @@ class LlmTui(App):
     def action_clear(self) -> None:
         self.transcript.remove_children()
         self.transcript.anchor()
+
+    def action_toggle_mcp(self) -> None:
+        """Open and close the mcp tally in the status bar. Fired by the click
+        markup in StatusBar.mcp_segment, so there is no key bound to it."""
+
+        self.status.mcp_open = not self.status.mcp_open
+        self.status.refresh_line()
