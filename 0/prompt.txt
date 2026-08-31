@@ -1,0 +1,6 @@
+continue
+
+---
+
+1) I added vault_copy back
+2) you can do the rewrite
