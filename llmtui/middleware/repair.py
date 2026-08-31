@@ -1,4 +1,4 @@
-"""after_model hook that recovers search calls the model failed to format."""
+"""after_model hook that recovers tool calls the model failed to format."""
 
 import json
 import uuid
@@ -7,10 +7,6 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain.agents.middleware import after_model, AgentState, Runtime
 
 
-# the calculator catches its own errors and its arguments are a single string,
-# so it does not share either failure mode. it can have its own handler if it
-# ever needs one.
-TOOL_NAME: str = "search_books"
 # hand the turn back this many times before letting it end. an invalid call
 # never reaches the tools node, so the tool call limit never counts it and
 # nothing else bounds this loop.
@@ -69,7 +65,7 @@ def _repair_attempts(messages: list) -> int:
 
 @after_model(can_jump_to=["model"])
 def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
-    """Recover search calls the model failed to format, before routing.
+    """Recover tool calls the model failed to format, before routing.
 
     Runs as a node between the model and the tools/end decision. Note that
     after_model hooks run in reverse of their order in the middleware list,
@@ -87,10 +83,10 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
     if not isinstance(message, AIMessage) or not message.invalid_tool_calls:
         return None
 
-    # check for invalid tool calls
-    broken = [c for c in message.invalid_tool_calls if c.get("name") == TOOL_NAME]
-    if not broken:
-        return None
+    # every tool is repaired the same way. the model runs several calls
+    # together into one argument string whatever it is calling, so the MCP
+    # tools hit this exactly as search_books does
+    broken = list(message.invalid_tool_calls)
 
     # decouple the dicts into multiple legal tool calls. a call whose arguments
     # yield nothing parseable is kept aside rather than quietly forgotten
@@ -111,8 +107,7 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
             })
 
     # drop invalids from the original message, so that we can later put the
-    # fixed versions back in. only the calls handled here are removed -- an
-    # invalid call for some other tool is left for whoever owns that tool
+    # fixed versions back in
     handled = {call["id"] for call in broken}
     blocks = []
     for block in message.content:
@@ -129,13 +124,13 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
     def dropped_notice(call: dict) -> ToolMessage:
         return ToolMessage(
             content=(
-                f"{DROPPED_MARKER} Your `{TOOL_NAME}` call was discarded and never "
-                f"ran: {call.get('error', 'arguments were not valid JSON')}. Its "
-                f"arguments started {str(call.get('args'))[:80]!r}. Treat this "
-                f"request as unanswered -- no passages were searched for it."
+                f"{DROPPED_MARKER} Your `{call['name']}` call was discarded and "
+                f"never ran: {call.get('error', 'arguments were not valid JSON')}. "
+                f"Its arguments started {str(call.get('args'))[:80]!r}. Treat this "
+                f"request as unanswered -- nothing was done for it."
             ),
             tool_call_id=call["id"],
-            name=TOOL_NAME,
+            name=call["name"],
             status="error",
         )
 
@@ -148,7 +143,7 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
                 "name": call["name"],
                 "args": call["args"],
             })
-        print(f"[REPAIR] recovered {len(recovered)} search call(s) from malformed arguments")
+        print(f"[REPAIR] recovered {len(recovered)} tool call(s) from malformed arguments")
         if unrepairable:
             print(f"[REPAIR] {len(unrepairable)} call(s) could not be recovered, reported to the model")
         return {
@@ -183,14 +178,14 @@ def repair_tool_calls(state: AgentState, runtime: Runtime) -> dict | None:
     for call in unrepairable:
         handbacks.append(ToolMessage(
             content=(
-                f"{REPAIR_MARKER} Your `{TOOL_NAME}` call could not be read: "
+                f"{REPAIR_MARKER} Your `{call['name']}` call could not be read: "
                 f"{call.get('error', 'arguments were not valid JSON')}. "
                 f"Reissue it as a single call whose arguments are one JSON "
-                f"object, for example {{\"query\": \"...\", \"book\": \"...\"}}. "
-                f"To run more than one search, make them in separate calls."
+                f"object, for example {{\"argument\": \"value\"}}. To run the "
+                f"tool more than once, make each run its own separate call."
             ),
             tool_call_id=call["id"],
-            name=TOOL_NAME,
+            name=call["name"],
             status="error",
         ))
 

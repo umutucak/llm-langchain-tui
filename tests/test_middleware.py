@@ -12,9 +12,12 @@ from langchain.tools import tool
 
 from llmtui.middleware import repair_tool_calls, route_tool_error
 
-BAD_CONCAT = ('{"query": "setting of the game", "book": "Heart Beneath the City"}'
-              '{"query": "what kind of adventures can you run", "book": "Heart Beneath the City"}')
+BAD_CONCAT = ('{"query": "setting of the game", "book": "core_rulebook"}'
+              '{"query": "what kind of adventures can you run", "book": "core_rulebook"}')
 TRUNCATED = '{"query": "grap'
+# the shape a checkpoint caught: qwen wanted three parallel vault_list calls
+BAD_MCP_CONCAT = ('{"path": "Campaign Notes"}{"path": "Rules"}'
+                  '{"path": "Session Logs"}')
 
 
 class ScriptedModel(BaseChatModel):
@@ -98,6 +101,40 @@ def build(responses, raises=False, run_limit=3):
             # handler for everything -- the same stack build_agent assembles
             ToolErrorMiddleware(on_error=route_tool_error(set()),
                                 tools=["search_books"]),
+            repair_tool_calls,
+        ],
+    )
+
+
+def build_with_mcp(responses):
+    """The same stack, but with an MCP tool loaded alongside search_books.
+
+    Mirrors what build_agent assembles once a server answers: the router and
+    ToolErrorMiddleware both know the MCP names.
+    """
+
+    CALLS.clear()
+
+    @tool
+    def search_books(query: str, book: str = "") -> str:
+        """Search the book library."""
+        CALLS.append(query)
+        return f"PASSAGE for {query!r}"
+
+    @tool
+    def vault_list(path: str) -> str:
+        """List a folder in the vault."""
+        CALLS.append(path)
+        return f"FILES under {path!r}"
+
+    mcp_names = {"vault_list"}
+    return create_agent(
+        model=ScriptedModel(responses=list(responses)),
+        tools=[search_books, vault_list],
+        middleware=[
+            ToolCallLimitMiddleware(tool_name="search_books", run_limit=3),
+            ToolErrorMiddleware(on_error=route_tool_error(mcp_names),
+                                tools=["search_books", *mcp_names]),
             repair_tool_calls,
         ],
     )
@@ -235,6 +272,27 @@ results["8 partial recovery"] = run(
              for m in r["messages"] if isinstance(m, AIMessage)
              for b in m.content if isinstance(b, dict))),
         ("run still produced an answer", r["messages"][-1].content[0].get("type") == "text"),
+    ])
+
+# ---- 9. the same malformation on an MCP tool, not search_books ----
+# the model ran three vault_list calls together into one set of arguments and
+# the turn died on the spot: no valid tool call to route on, no text block to
+# show, so the answer just stopped after the reasoning
+agent = build_with_mcp([ai_invalid(BAD_MCP_CONCAT, name="vault_list"),
+                        ai_text("Three folders listed.")])
+results["9 mcp repair"] = run(
+    "CASE 9  malformed MCP call -> three executed listings, turn survives", agent,
+    lambda r: [
+        ("all three paths listed",
+         CALLS == ["Campaign Notes", "Rules", "Session Logs"]),
+        ("three ToolMessages returned",
+         sum(isinstance(m, ToolMessage) for m in r["messages"]) == 3),
+        ("no invalid_tool_call block left in history",
+         all(b.get("type") != "invalid_tool_call"
+             for m in r["messages"] if isinstance(m, AIMessage)
+             for b in m.content if isinstance(b, dict))),
+        ("the turn reached an answer instead of ending early",
+         r["messages"][-1].content[0].get("type") == "text"),
     ])
 
 print("\n" + "="*70)

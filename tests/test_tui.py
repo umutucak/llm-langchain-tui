@@ -120,9 +120,9 @@ check("0  helpers", [
 # ---- 1. a turn with two searches ----
 async def case_search():
     app = build_app([
-        ai_calls([("search_books", {"query": "initiative", "book": "draw_steel"}),
+        ai_calls([("search_books", {"query": "initiative", "book": "core_rulebook"}),
                   ("search_books", {"query": "holding a turn"})]),
-        ai_text("In **Draw Steel**, initiative is not rolled.\n\n- Teams alternate\n"),
+        ai_text("In the **core rulebook**, initiative is not rolled.\n\n- Teams alternate\n"),
     ])
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "how does initiative work"
@@ -144,7 +144,7 @@ async def case_search():
             ("titles report passage counts",
              all("2 passages" in str(r.title) for r in rows)),
             ("book argument shown in the label",
-             any("draw_steel" in str(r.title) for r in rows)),
+             any("core_rulebook" in str(r.title) for r in rows)),
             ("answer mounted as a Markdown widget", len(answers) == 1),
             # query the DOM, not the attribute: .reasoning holds the *current*
             # round's pane, and this run's second round emits no reasoning at all
