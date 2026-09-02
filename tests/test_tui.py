@@ -9,6 +9,7 @@ import sqlite3
 import sys
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -22,8 +23,11 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from textual.widgets import Collapsible, Markdown, SelectionList, Static
 
+from llmtui.middleware import route_tool_error
+from llmtui.tools.mcp import MCPStatus
 from llmtui.tui import (
-    AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar, ToolRow, compact, meter,
+    ROW_PREVIEW_CHARS, AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar,
+    ToolRow, compact, meter,
 )
 
 
@@ -54,11 +58,15 @@ def ai_text(text):
     return AIMessage(content=[{"type": "text", "text": text}], id=str(uuid.uuid4()))
 
 
-@tool
-async def search_books(query: str, book: str = "") -> str:
+# content_and_artifact like the real one: the passage count rides beside the
+# text, because that is the only thing telling an empty search from a full one
+@tool(response_format="content_and_artifact")
+async def search_books(query: str, book: str = "") -> tuple[str, dict]:
     """Search the book library."""
     await asyncio.sleep(0.02)
-    return f"[core.pdf p.1]\nPassage about {query}\n\n---\n\n[core.pdf p.2]\nMore about {query}"
+    text = (f"[core.pdf p.1]\nPassage about {query}\n\n---\n\n"
+            f"[core.pdf p.2]\nMore about {query}")
+    return text, {"passages": 2}
 
 
 def build_app(responses):
@@ -73,7 +81,7 @@ def build_app(responses):
         checkpointer=MemorySaver(),
     )
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-    return LlmTui(agent, None, connection, config)
+    return LlmTui(agent, None, connection, config, MCPStatus())
 
 
 async def ask(app, text, settle=1.4):
@@ -117,9 +125,9 @@ check("0  helpers", [
 # ---- 1. a turn with two searches ----
 async def case_search():
     app = build_app([
-        ai_calls([("search_books", {"query": "initiative", "book": "draw_steel"}),
+        ai_calls([("search_books", {"query": "initiative", "book": "core_rulebook"}),
                   ("search_books", {"query": "holding a turn"})]),
-        ai_text("In **Draw Steel**, initiative is not rolled.\n\n- Teams alternate\n"),
+        ai_text("In the **core rulebook**, initiative is not rolled.\n\n- Teams alternate\n"),
     ])
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "how does initiative work"
@@ -141,7 +149,7 @@ async def case_search():
             ("titles report passage counts",
              all("2 passages" in str(r.title) for r in rows)),
             ("book argument shown in the label",
-             any("draw_steel" in str(r.title) for r in rows)),
+             any("core_rulebook" in str(r.title) for r in rows)),
             ("answer mounted as a Markdown widget", len(answers) == 1),
             # query the DOM, not the attribute: .reasoning holds the *current*
             # round's pane, and this run's second round emits no reasoning at all
@@ -186,7 +194,8 @@ async def case_error():
         tools=[search_books],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(agent, None, connection, {"configurable": {"thread_id": str(uuid.uuid4())}})
+    app = LlmTui(agent, None, connection,
+                  {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
 
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "grappling rules"
@@ -237,7 +246,7 @@ async def case_middleware():
     would settle a failed search as a green success.
     """
     from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
-    from llmtui.middleware import on_search_error, repair_tool_calls
+    from llmtui.middleware import repair_tool_calls, route_tool_error
 
     @tool
     async def search_books(query: str, book: str = "") -> str:
@@ -255,12 +264,16 @@ async def case_middleware():
         tools=[search_books],
         middleware=[
             ToolCallLimitMiddleware(tool_name="search_books", run_limit=3),
-            ToolErrorMiddleware(on_error=on_search_error, tools=["search_books"]),
+            # no MCP tools here, so the router falls through to the search
+            # handler for everything -- the same stack build_agent assembles
+            ToolErrorMiddleware(on_error=route_tool_error(set()),
+                                tools=["search_books"]),
             repair_tool_calls,
         ],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(agent, None, connection, {"configurable": {"thread_id": str(uuid.uuid4())}})
+    app = LlmTui(agent, None, connection,
+                  {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
 
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "grappling rules"
@@ -312,7 +325,8 @@ async def case_async_saver():
         # a separate model instance, because naming pops from its own script
         namer = ScriptedModel(responses=[AIMessage(content="Initiative Rules")])
         thread_id = str(uuid.uuid4())
-        app = LlmTui(agent, namer, connection, {"configurable": {"thread_id": thread_id}})
+        app = LlmTui(agent, namer, connection,
+                      {"configurable": {"thread_id": thread_id}}, MCPStatus())
 
         async with app.run_test() as pilot:
             app.query_one("#prompt").text = "how does initiative work"
@@ -357,7 +371,8 @@ async def case_load():
         )
         namer = ScriptedModel(responses=[AIMessage(content="Draw Steel Initiative")])
         first = str(uuid.uuid4())
-        app = LlmTui(agent, namer, connection, {"configurable": {"thread_id": first}})
+        app = LlmTui(agent, namer, connection,
+                      {"configurable": {"thread_id": first}}, MCPStatus())
 
         async with app.run_test() as pilot:
             # a turn worth coming back to
@@ -474,7 +489,8 @@ async def case_new_and_self_delete():
         namer = ScriptedModel(responses=[AIMessage(content="First Chat"),
                                          AIMessage(content="Second Chat")])
         first = str(uuid.uuid4())
-        app = LlmTui(agent, namer, connection, {"configurable": {"thread_id": first}})
+        app = LlmTui(agent, namer, connection,
+                      {"configurable": {"thread_id": first}}, MCPStatus())
 
         async with app.run_test() as pilot:
             app.query_one("#prompt").text = "first question"
@@ -692,7 +708,304 @@ async def case_footer_stacking():
         ])
 
 
+async def case_mcp_degrades():
+    """A server that is not listening costs its own tools and nothing else.
+
+    Obsidian being closed used to take the whole app down on launch, because
+    get_mcp_tools raised straight through build_agent into main_async. The
+    reasons matter as much as the survival: they are what the status bar shows,
+    and they arrive buried several ExceptionGroups deep with the group's own
+    str() reading "unhandled errors in a TaskGroup".
+    """
+    import httpx
+    from llmtui.tools import mcp
+
+    def wrap(exc):
+        """Two groups deep, the way anyio actually delivers these."""
+        return ExceptionGroup("unhandled errors in a TaskGroup",
+                              [ExceptionGroup("inner", [exc])])
+
+    response = httpx.Response(401, request=httpx.Request("POST", "https://127.0.0.1/mcp/"))
+
+    reasons = [
+        ("connection refused reads as not running",
+         mcp._reason(wrap(httpx.ConnectError("All connection attempts failed")))
+         == "not running"),
+        ("the same failure mid-session reads as a dropped connection",
+         mcp._reason(wrap(httpx.ConnectError("All connection attempts failed")),
+                     dropped=True) == "lost connection"),
+        ("a self-signed cert is named as such, not as a connection failure",
+         mcp._reason(wrap(httpx.ConnectError(
+             "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+             "self-signed certificate"))) == "certificate not trusted"),
+        ("a 401 is reported as the key being refused",
+         mcp._reason(wrap(httpx.HTTPStatusError(
+             "401", request=response.request, response=response)))
+         == "refused the api key (401)"),
+    ]
+
+    # port 1 is not going to be listening, so this is a real refused connection
+    # through the real client rather than a stubbed one
+    original = mcp.MCP_SERVERS
+    mcp.MCP_SERVERS = {
+        "ghost": {"transport": "http", "url": "http://127.0.0.1:1/mcp/"},
+    }
+    status = MCPStatus()
+    try:
+        tools = await mcp.get_mcp_tools(status)
+    finally:
+        mcp.MCP_SERVERS = original
+
+    check("13  a dead MCP server degrades instead of raising", reasons + [
+        ("no tools came back", tools == []),
+        ("every configured server is accounted for", set(status.servers) == {"ghost"}),
+        ("and it says why", status.servers["ghost"] == "not running"),
+        ("none of them count as live", status.live == []),
+    ])
+
+
+async def case_mcp_live_status():
+    """A call that fails marks its server down; one that answers marks it up.
+
+    The discriminator is structural, not a guess: only transport failures raise
+    inside the interceptor chain. An isError result from the server is turned
+    into an exception one layer further out, after the chain has returned, so
+    in here it arrives as an ordinary return -- which is right, because the
+    server plainly answered.
+    """
+    import httpx
+    from llmtui.tools import mcp
+
+    status = MCPStatus({"obsidian": None})
+    watch = mcp._watch_servers(status)
+    request = SimpleNamespace(server_name="obsidian")
+
+    async def unreachable(req):
+        raise httpx.ConnectError("All connection attempts failed")
+
+    async def server_answered_no(req):
+        # what execute_tool returns for isError=True: a result, not a raise
+        return SimpleNamespace(isError=True, content=[])
+
+    reraised = False
+    try:
+        await watch(request, unreachable)
+    except httpx.ConnectError:
+        reraised = True
+    after_drop = status.servers["obsidian"]
+
+    await watch(request, server_answered_no)
+    after_server_error = status.servers["obsidian"]
+
+    check("16  call outcomes keep the server verdict current", [
+        ("a transport failure marks the server down",
+         after_drop == "lost connection"),
+        ("and is re-raised so the middleware can still tell the model", reraised),
+        ("a server-reported error still counts as reachable",
+         after_server_error is None),
+        ("so it is live again", status.live == ["obsidian"]),
+    ])
+
+
+async def case_mcp_status_is_live():
+    """The bar reflects a mid-run change with nothing wired to notify it.
+
+    StatusBar holds the MCPStatus by reference rather than copying it, and the
+    bar is repainted on every state change anyway, so a server going down
+    during a turn shows up on the next repaint without a callback.
+    """
+    status = MCPStatus({"obsidian": None})
+    app = build_app([ai_text("ok")])
+    app.mcp_status = status
+
+    async with app.run_test(size=(120, 12)) as pilot:
+        bar = app.query_one(StatusBar)
+        before = bar.render().plain
+
+        # exactly what the interceptor does, from outside the widget
+        status.mark_down("obsidian", "lost connection")
+        stale = bar.render().plain          # not repainted yet
+        app.status.set_state("thinking")    # any state change repaints
+        await pilot.pause()
+        after = bar.render().plain
+
+        check("17  the bar picks up a mid-run change on the next repaint", [
+            ("green before", "mcp 1/1" in before),
+            ("the widget was never told anything", "mcp 1/1" in stale),
+            ("and it is red after the next repaint", "mcp 0/1" in after),
+        ])
+
+
+async def case_mcp_status_bar():
+    """The mcp tally opens into the server names when clicked."""
+    app = build_app([ai_text("ok")])
+    app.mcp_status = MCPStatus({"obsidian": None, "ghost": "not running"})
+
+    async with app.run_test(size=(120, 12)) as pilot:
+        status = app.query_one(StatusBar)
+        collapsed = status.render().plain
+
+        # click the segment where it is actually drawn, rather than calling the
+        # action directly -- that would leave the markup wiring untested
+        await pilot.click(StatusBar, offset=(collapsed.index("mcp") + 1, 0))
+        await pilot.pause()
+        expanded = status.render().plain
+        opened = status.mcp_open
+
+        await pilot.click(StatusBar, offset=(expanded.index("mcp") + 1, 0))
+        await pilot.pause()
+
+        check("14  the mcp button opens into the server names", [
+            ("collapsed shows how many of how many", "mcp 1/2" in collapsed),
+            ("collapsed does not spend the row on names", "obsidian" not in collapsed),
+            ("clicking it expands", opened),
+            ("the connected server is named", "obsidian" in expanded),
+            ("the missing one says why", "ghost (not running)" in expanded),
+            ("clicking again collapses", not status.mcp_open),
+            ("no markup leaked into the text", "[" not in collapsed),
+        ])
+
+
+async def case_build_agent():
+    """build_agent itself has to run, with MCP tools and without them.
+
+    Every other case here builds its agent with create_agent directly, so the
+    real builder was never executed by a test -- which is how it shipped with
+    two ToolErrorMiddleware in it, a combination create_agent rejects outright
+    ("Please remove duplicate middleware instances"). Both arities are checked
+    because the empty one is what a closed vault produces.
+    """
+    from llmtui.agent import build_agent
+
+    @tool
+    def vault_read(path: str) -> str:
+        """Read a note."""
+        return "note"
+
+    built = {}
+    for label, mcp_tools in (("without mcp", []), ("with mcp", [vault_read])):
+        try:
+            built[label] = build_agent(None, MemorySaver(), mcp_tools) is not None
+        except Exception as exc:
+            built[label] = f"{type(exc).__name__}: {exc}"
+
+    # the routing is what the single middleware bought, so check it still sorts
+    handler = route_tool_error({"vault_read"})
+    boom = RuntimeError("server went away")
+
+    def said(tool_name):
+        return handler(boom, SimpleNamespace(tool_call={"name": tool_name}))
+
+    check("15  build_agent runs, and tool errors reach the right handler", [
+        ("builds with no MCP tools", built["without mcp"] is True),
+        ("builds with MCP tools", built["with mcp"] is True),
+        ("an MCP failure talks about reaching a server",
+         "could not reach the server" in said("vault_read")),
+        ("a search failure still talks about the library",
+         "document library" in said("search_books")),
+    ])
+
+
+# ---- 18. an MCP result is text, not a repr of its content blocks ----
+async def case_mcp_row_body():
+    # MCP tools answer with a list of content blocks. str() on that gives a
+    # python repr with the newlines escaped, so a long note arrived as one
+    # 26k-character line and opening the row locked the screen up
+    @tool(response_format="content_and_artifact")
+    async def vault_read(path: str):
+        """Read a vault note."""
+        note = "\n".join(f"line {i} of a very long note" for i in range(600))
+        return [{"type": "text", "text": note, "id": "lc_test"}], None
+
+    connection = sqlite3.connect(":memory:", check_same_thread=False)
+    connection.execute("CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, title TEXT,"
+                       " created_at TEXT, updated_at TEXT)")
+    agent = create_agent(
+        model=ScriptedModel(responses=[
+            ai_calls([("vault_read", {"path": "Places/Somewhere.md"})]),
+            ai_text("Read the note."),
+        ]),
+        tools=[vault_read],
+        checkpointer=MemorySaver(),
+    )
+    app = LlmTui(agent, None, connection,
+                 {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
+
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "read my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        rows = list(app.query(ToolRow))
+        body = str(rows[0]._body.content) if rows else ""
+        longest = max((len(line) for line in body.split("\n")), default=0)
+
+        check("18  a long MCP result renders as text, capped", [
+            ("the row resolved", rows and rows[0].has_class("-ok")),
+            # an MCP tool reports no passage count, so the row shows size
+            ("no passage count invented for a tool that reports none",
+             "passage" not in str(rows[0].title) if rows else False),
+            ("the note's own text is shown", "line 0 of a very long note" in body),
+            ("no content-block repr leaked in", "'type': 'text'" not in body),
+            ("newlines survived, so nothing is one huge line", longest < 100),
+            ("body capped near the preview limit",
+             len(body) <= ROW_PREVIEW_CHARS + 80),
+            ("the reader is told what was withheld", "more characters" in body),
+        ])
+
+
+# ---- 19. a search that matched nothing does not read as a success ----
+async def case_empty_search():
+    # search_books answers a miss with guidance text and no passages, which is
+    # a perfectly successful call. counting separators in that text used to
+    # score it as "1 passage" behind a green tick
+    @tool(response_format="content_and_artifact")
+    async def search_books(query: str, book: str = "") -> tuple[str, dict]:
+        """Search the book library."""
+        return "No passages matched anywhere in the document library.", {"passages": 0}
+
+    connection = sqlite3.connect(":memory:", check_same_thread=False)
+    connection.execute("CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, title TEXT,"
+                       " created_at TEXT, updated_at TEXT)")
+    agent = create_agent(
+        model=ScriptedModel(responses=[
+            ai_calls([("search_books", {"query": "a topic no book covers"})]),
+            ai_text("The library does not cover that."),
+        ]),
+        tools=[search_books],
+        checkpointer=MemorySaver(),
+    )
+    app = LlmTui(agent, None, connection,
+                 {"configurable": {"thread_id": str(uuid.uuid4())}}, MCPStatus())
+
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "something obscure"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        rows = list(app.query(ToolRow))
+        title = str(rows[0].title) if rows else ""
+
+        check("19  an empty search reads as a miss, not a success", [
+            ("the row is not marked ok", rows and not rows[0].has_class("-ok")),
+            ("it is marked empty", rows and rows[0].has_class("-empty")),
+            ("but it is not an error either", rows and not rows[0].has_class("-error")),
+            ("the title says so", "no passages" in title),
+            ("no invented passage count", "1 passage" not in title),
+            ("the run still answered", len(list(app.query(Markdown))) == 1),
+        ])
+
+
 async def main():
+    await case_empty_search()
+    await case_mcp_row_body()
+    await case_build_agent()
+    await case_mcp_degrades()
+    await case_mcp_live_status()
+    await case_mcp_status_is_live()
+    await case_mcp_status_bar()
     await case_footer_stacking()
     await case_prompt_wraps()
     await case_multi_round_reasoning()

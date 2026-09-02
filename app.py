@@ -10,6 +10,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from llmtui.agent import build_agent, build_model
 from llmtui.config import SQLITE_DB_PATH
 from llmtui.sessions import connect
+from llmtui.tools.mcp import MCPStatus, get_mcp_tools
 from llmtui.tui import LlmTui
 
 # announces that its beta, so we shush it
@@ -31,7 +32,14 @@ async def main_async() -> None:
     async with AsyncSqliteSaver.from_conn_string(SQLITE_DB_PATH) as memory:
         await memory.setup()
 
-        agent = build_agent(model, memory)
+        # mcp_tools goes into build_agent to give the graph the tools
+        # mcp_status goes into the tui to report what (if at all) mcp servers are connected to
+        # one live object, not a snapshot: get_mcp_tools fills it in, and an
+        # interceptor keeps it current as calls succeed and fail during the run
+        mcp_status = MCPStatus()
+        mcp_tools = await get_mcp_tools(mcp_status)
+
+        agent = build_agent(model, memory, mcp_tools)
 
         agent_thread_config = {
             "configurable": {
@@ -39,7 +47,9 @@ async def main_async() -> None:
             }
         }
 
-        await LlmTui(agent, model, sqlite_connection, agent_thread_config).run_async()
+        await LlmTui(
+            agent, model, sqlite_connection, agent_thread_config, mcp_status
+        ).run_async()
 
 
 def main() -> None:

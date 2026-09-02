@@ -12,3 +12,4 @@ pypilvus==3.0.1
 pymupdf==1.28.2
 tqdm==4.70.0
 textual==8.2.8
+langchain-mcp-adapter==0.3.2

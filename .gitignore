@@ -7,3 +7,5 @@ resources/
 .entire/
 # herve:gitignore:end
 .claude
+.env
+.vscode

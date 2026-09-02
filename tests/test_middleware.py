@@ -9,12 +9,16 @@ from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain.agents import create_agent
 from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
 from langchain.tools import tool
+from langchain_ollama.chat_models import ChatOllama
 
-from llmtui.middleware import on_search_error, repair_tool_calls
+from llmtui.middleware import repair_tool_calls, route_tool_error
 
-BAD_CONCAT = ('{"query": "setting of the game", "book": "Heart Beneath the City"}'
-              '{"query": "what kind of adventures can you run", "book": "Heart Beneath the City"}')
+BAD_CONCAT = ('{"query": "setting of the game", "book": "core_rulebook"}'
+              '{"query": "what kind of adventures can you run", "book": "core_rulebook"}')
 TRUNCATED = '{"query": "grap'
+# the shape a checkpoint caught: qwen wanted three parallel vault_list calls
+BAD_MCP_CONCAT = ('{"path": "Campaign Notes"}{"path": "Rules"}'
+                  '{"path": "Session Logs"}')
 
 
 class ScriptedModel(BaseChatModel):
@@ -33,12 +37,19 @@ class ScriptedModel(BaseChatModel):
         return self
 
 
+# what ChatOllama stamps on everything it returns. ChatOllama only unpacks v1
+# content blocks on a message carrying this, so a fixture without it cannot
+# catch a middleware that rebuilds a message and loses it
+V1_META = {"model_provider": "ollama", "output_version": "v1"}
+
+
 def ai_invalid(args, name="search_books", cid=None):
     cid = cid or str(uuid.uuid4())
     m = AIMessage(
         content=[{"type": "reasoning", "reasoning": "thinking", "index": 0},
                  {"type": "invalid_tool_call", "id": cid, "name": name,
                   "args": args, "error": "Failed to parse tool call arguments as JSON"}],
+        response_metadata=dict(V1_META),
         id=str(uuid.uuid4()))
     m.invalid_tool_calls = [{"name": name, "args": args, "id": cid,
                              "error": "Failed to parse tool call arguments as JSON",
@@ -53,7 +64,8 @@ def ai_valid(calls):
         cid = str(uuid.uuid4())
         tcs.append({"name": name, "args": args, "id": cid, "type": "tool_call"})
         blocks.append({"type": "tool_call", "id": cid, "name": name, "args": args})
-    return AIMessage(content=blocks, tool_calls=tcs, id=str(uuid.uuid4()))
+    return AIMessage(content=blocks, tool_calls=tcs,
+                     response_metadata=dict(V1_META), id=str(uuid.uuid4()))
 
 
 def ai_invalid_many(argstrings, name="search_books"):
@@ -67,13 +79,15 @@ def ai_invalid_many(argstrings, name="search_books"):
         invalid.append({"name": name, "args": args, "id": cid,
                         "error": "Failed to parse tool call arguments as JSON",
                         "type": "invalid_tool_call"})
-    m = AIMessage(content=blocks, id=str(uuid.uuid4()))
+    m = AIMessage(content=blocks, response_metadata=dict(V1_META),
+                  id=str(uuid.uuid4()))
     m.invalid_tool_calls = invalid
     return m
 
 
 def ai_text(text):
-    return AIMessage(content=[{"type": "text", "text": text}], id=str(uuid.uuid4()))
+    return AIMessage(content=[{"type": "text", "text": text}],
+                     response_metadata=dict(V1_META), id=str(uuid.uuid4()))
 
 
 CALLS = []
@@ -94,7 +108,44 @@ def build(responses, raises=False, run_limit=3):
         tools=[search_books],
         middleware=[
             ToolCallLimitMiddleware(tool_name="search_books", run_limit=run_limit),
-            ToolErrorMiddleware(on_error=on_search_error, tools=["search_books"]),
+            # no MCP tools here, so the router falls through to the search
+            # handler for everything -- the same stack build_agent assembles
+            ToolErrorMiddleware(on_error=route_tool_error(set()),
+                                tools=["search_books"]),
+            repair_tool_calls,
+        ],
+    )
+
+
+def build_with_mcp(responses):
+    """The same stack, but with an MCP tool loaded alongside search_books.
+
+    Mirrors what build_agent assembles once a server answers: the router and
+    ToolErrorMiddleware both know the MCP names.
+    """
+
+    CALLS.clear()
+
+    @tool
+    def search_books(query: str, book: str = "") -> str:
+        """Search the book library."""
+        CALLS.append(query)
+        return f"PASSAGE for {query!r}"
+
+    @tool
+    def vault_list(path: str) -> str:
+        """List a folder in the vault."""
+        CALLS.append(path)
+        return f"FILES under {path!r}"
+
+    mcp_names = {"vault_list"}
+    return create_agent(
+        model=ScriptedModel(responses=list(responses)),
+        tools=[search_books, vault_list],
+        middleware=[
+            ToolCallLimitMiddleware(tool_name="search_books", run_limit=3),
+            ToolErrorMiddleware(on_error=route_tool_error(mcp_names),
+                                tools=["search_books", *mcp_names]),
             repair_tool_calls,
         ],
     )
@@ -232,6 +283,54 @@ results["8 partial recovery"] = run(
              for m in r["messages"] if isinstance(m, AIMessage)
              for b in m.content if isinstance(b, dict))),
         ("run still produced an answer", r["messages"][-1].content[0].get("type") == "text"),
+    ])
+
+# ---- 9. the same malformation on an MCP tool, not search_books ----
+# the model ran three vault_list calls together into one set of arguments and
+# the turn died on the spot: no valid tool call to route on, no text block to
+# show, so the answer just stopped after the reasoning
+agent = build_with_mcp([ai_invalid(BAD_MCP_CONCAT, name="vault_list"),
+                        ai_text("Three folders listed.")])
+results["9 mcp repair"] = run(
+    "CASE 9  malformed MCP call -> three executed listings, turn survives", agent,
+    lambda r: [
+        ("all three paths listed",
+         CALLS == ["Campaign Notes", "Rules", "Session Logs"]),
+        ("three ToolMessages returned",
+         sum(isinstance(m, ToolMessage) for m in r["messages"]) == 3),
+        ("no invalid_tool_call block left in history",
+         all(b.get("type") != "invalid_tool_call"
+             for m in r["messages"] if isinstance(m, AIMessage)
+             for b in m.content if isinstance(b, dict))),
+        ("the turn reached an answer instead of ending early",
+         r["messages"][-1].content[0].get("type") == "text"),
+    ])
+
+# ---- 10. the repaired message can still be sent back to ollama ----
+# ChatOllama only unpacks v1 blocks -- reasoning, tool_call -- on a message
+# whose response_metadata says output_version is v1. rebuilding the message
+# from scratch dropped that, so the repair worked and then the next model call
+# died on "Unsupported message content type"
+def converts(result) -> bool:
+    """Would ChatOllama accept this history on the next model call?"""
+
+    try:
+        ChatOllama(model="qwen3.8:27b")._convert_messages_to_ollama_messages(
+            result["messages"])
+        return True
+    except ValueError as exc:
+        print(f"    converter rejected the history: {exc}")
+        return False
+
+
+agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
+results["10 ollama accepts repair"] = run(
+    "CASE 10  the repaired message is still sendable to ollama", agent,
+    lambda r: [
+        ("the repaired message kept the model's own metadata",
+         all(m.response_metadata.get("output_version") == "v1"
+             for m in r["messages"] if isinstance(m, AIMessage))),
+        ("the whole history converts for the next model call", converts(r)),
     ])
 
 print("\n" + "="*70)

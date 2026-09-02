@@ -30,11 +30,39 @@ from textual.widgets import (
 from llmtui import config
 from llmtui.naming import name_session_if_unnamed
 from llmtui.sessions import delete_session, list_sessions, set_session_title
+from llmtui.tools.mcp import MCPStatus
 
 
 SPINNER: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 # how many blocks wide the context meter is drawn
 METER_WIDTH: int = 8
+# most a tool row will put on screen. the row is a preview, and an auto-height
+# Static holding a whole note re-lays the log out every time it is opened
+ROW_PREVIEW_CHARS: int = 4000
+
+
+def tool_text(content) -> str:
+    """The text a tool returned, out of whichever shape it came back in.
+
+    Local tools return a string. MCP tools return a list of content blocks, and
+    str() on that gives a python repr -- newlines escaped, so the whole result
+    lands on one line and wrapping it is what locks the screen up.
+    """
+
+    if isinstance(content, list):
+        return "\n".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content or "")
+
+
+def preview(text: str) -> str:
+    """Enough of a tool result to read, without the rest of it on screen."""
+
+    if len(text) <= ROW_PREVIEW_CHARS:
+        return text
+    return f"{text[:ROW_PREVIEW_CHARS]}\n\n… {len(text) - ROW_PREVIEW_CHARS} more characters"
 
 
 def meter(used: int, total: int) -> str:
@@ -114,7 +142,7 @@ class ToolRow(Collapsible):
         # it, and ToolErrorMiddleware catches search failures first and hands back
         # a ToolMessage with status="error" instead. the repair middleware's
         # dropped-call notices arrive the same way
-        text = str(getattr(output, "content", output) or "")
+        text = tool_text(getattr(output, "content", output))
         failed = error is not None or getattr(output, "status", None) == "error"
 
         if failed:
@@ -127,16 +155,27 @@ class ToolRow(Collapsible):
             # a ToolMessage with no exception is how the repair middleware reports
             # a dropped call. on_search_error's guidance is deliberately not shown
             # here -- it is instruction written for the model, not for the reader
-            self._body.update(str(error) if error is not None else text)
+            self._body.update(preview(str(error) if error is not None else text))
             return
 
-        # search_books joins its passages with this separator, so splitting on it
-        # gets the count back without the tool having to report one
-        passages = text.split("\n\n---\n\n") if text.strip() else []
-        self.add_class("-ok")
-        plural = "" if len(passages) == 1 else "s"
-        self.title = self._row_title("✓", f"{len(passages)} passage{plural}{when}")
-        self._body.update(text or "(nothing returned)")
+        # a search that matched nothing is not a failure, so it arrives here
+        # looking like any other answer. search_books puts its count in the
+        # artifact, which is the only way to tell the two apart -- a tool that
+        # reports no count gets its size instead of an invented passage figure
+        passages = (getattr(output, "artifact", None) or {}).get("passages")
+
+        if passages == 0:
+            self.add_class("-empty")
+            self.title = self._row_title("∅", f"no passages{when}")
+        elif passages is not None:
+            self.add_class("-ok")
+            plural = "" if passages == 1 else "s"
+            self.title = self._row_title("✓", f"{passages} passage{plural}{when}")
+        else:
+            self.add_class("-ok")
+            self.title = self._row_title("✓", f"{compact(len(text))} chars{when}")
+
+        self._body.update(preview(text) or "(nothing returned)")
 
 
 class AssistantTurn(Vertical):
@@ -261,14 +300,44 @@ class PromptArea(TextArea):
 
 
 class StatusBar(Static):
-    """State, context pressure and generation speed."""
+    """State, context pressure, generation speed and the MCP servers."""
 
-    def __init__(self) -> None:
+    def __init__(self, mcp_status: MCPStatus) -> None:
         super().__init__(id="status")
         self.state = "ready"
         self.ctx_used = 0
         self.tps = 0.0
         self.elapsed = 0.0
+        # held by reference and read at render time, never copied. the
+        # interceptor in mcp.py writes to this same object as calls fail and
+        # recover, so every repaint shows the current verdict for free
+        self.mcp = mcp_status
+        self.mcp_open = False
+
+    def mcp_segment(self) -> str:
+        """The mcp button: a tally that opens into the roll call when clicked.
+
+        How many servers there are is not known here, and the bar is one row,
+        so the names cannot all live on it permanently. Collapsed it is a count
+        you can read at a glance; clicking swaps in the names, and the ones
+        that failed say why. [@click=...] is Textual's own markup, so this
+        stays one Static rather than becoming a row of widgets.
+        """
+
+        servers = self.mcp.servers
+        live = self.mcp.live
+
+        if not self.mcp_open:
+            colour = "$success" if len(live) == len(servers) else "$error"
+            label = f"mcp [{colour}]{len(live)}/{len(servers)}[/]"
+        else:
+            label = "mcp " + " ".join(
+                f"[$success]{name}[/]" if failed is None
+                else f"[$error]{name} ({failed})[/]"
+                for name, failed in servers.items()
+            )
+
+        return f"[@click=app.toggle_mcp()]{label}[/]"
 
     def refresh_line(self) -> None:
         parts = [f"[b]{self.state}[/b]"]
@@ -281,6 +350,9 @@ class StatusBar(Static):
             parts.append(f"{self.tps:.0f} tok/s")
         if self.elapsed:
             parts.append(f"{self.elapsed:.1f}s")
+        # nothing to say when no servers are configured at all
+        if self.mcp.servers:
+            parts.append(self.mcp_segment())
         parts += ["esc stop", "^q quit", "/help"]
         self.update("  ·  ".join(parts))
 
@@ -398,12 +470,14 @@ class LlmTui(App):
         ("ctrl+l", "clear", "clear transcript"),
     ]
 
-    def __init__(self, agent, model, sqlite_connection, agent_thread_config) -> None:
+    def __init__(self, agent, model, sqlite_connection, agent_thread_config,
+                 mcp_status: MCPStatus) -> None:
         super().__init__()
         self.agent = agent
         self.model = model
         self.sqlite_connection = sqlite_connection
         self.agent_thread_config = agent_thread_config
+        self.mcp_status = mcp_status
         self._turn_started = 0.0
         self._out_chars = 0
 
@@ -418,7 +492,7 @@ class LlmTui(App):
         with Vertical(id="footer"):
             yield PromptArea(placeholder="ask about the library, or /help",
                              soft_wrap=True, highlight_cursor_line=False, id="prompt")
-            yield StatusBar()
+            yield StatusBar(self.mcp_status)
 
     def on_mount(self) -> None:
         self.transcript = self.query_one("#transcript", VerticalScroll)
@@ -718,3 +792,10 @@ class LlmTui(App):
     def action_clear(self) -> None:
         self.transcript.remove_children()
         self.transcript.anchor()
+
+    def action_toggle_mcp(self) -> None:
+        """Open and close the mcp tally in the status bar. Fired by the click
+        markup in StatusBar.mcp_segment, so there is no key bound to it."""
+
+        self.status.mcp_open = not self.status.mcp_open
+        self.status.refresh_line()
