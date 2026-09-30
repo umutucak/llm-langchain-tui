@@ -1,6 +1,8 @@
 """For all the MCP client interfaces."""
 import httpx
 
+from collections.abc import Awaitable, Callable
+
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools.base import BaseTool
 
@@ -63,6 +65,53 @@ WHITELISTED_TOOLS: set[str] = {
     "search_simple",
     "open_file"
 }
+
+
+# the tools that can change what a note says. every one of these is held at the
+# approval gate in build_agent -- moving, copying and opening a note are writes
+# too, but none of them can rewrite the text of one
+WRITE_TOOLS: set[str] = {
+    "vault_write",
+    "vault_append",
+    "vault_patch",
+    "vault_delete",
+}
+
+
+def tool_text(content) -> str:
+    """The text a tool returned, out of whichever shape it came back in.
+
+    Local tools return a string. MCP tools return a list of content blocks, and
+    str() on that gives a python repr -- newlines escaped, so the whole result
+    lands on one line and wrapping it is what locks the screen up.
+    """
+
+    if isinstance(content, list):
+        return "\n".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content or "")
+
+
+def vault_reader(tools: list[BaseTool]) -> Callable[..., Awaitable[str]] | None:
+    """An await-able read of one note, or None if the server never offered one.
+
+    Handed to the preview builder so it can show what a write would change.
+    Returns the note's text, and raises whatever the server raised -- a missing
+    file and a missing heading both arrive that way, and the caller decides
+    which of those is worth showing as an error.
+    """
+
+    read = next((tool for tool in tools if tool.name == "vault_read"), None)
+    if read is None:
+        return None
+
+    async def read_note(path: str, **target) -> str:
+        args = {"path": path, **{k: v for k, v in target.items() if v is not None}}
+        return tool_text(await read.ainvoke(args))
+
+    return read_note
 
 
 def _reason(exc: BaseException, dropped: bool = False) -> str:

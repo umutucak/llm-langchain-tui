@@ -16,6 +16,9 @@ import time
 
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.utils.uuid import uuid7
+from langgraph.types import Command
+
+from rich.syntax import Syntax
 
 from textual import events, on, work
 from textual.app import App, ComposeResult
@@ -30,7 +33,8 @@ from textual.widgets import (
 from llmtui import config
 from llmtui.naming import name_session_if_unnamed
 from llmtui.sessions import delete_session, list_sessions, set_session_title
-from llmtui.tools.mcp import MCPStatus
+from llmtui.tools.mcp import MCPStatus, WRITE_TOOLS, tool_text
+from llmtui.writes import WritePreview, preview_write
 
 
 SPINNER: str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -39,22 +43,6 @@ METER_WIDTH: int = 8
 # most a tool row will put on screen. the row is a preview, and an auto-height
 # Static holding a whole note re-lays the log out every time it is opened
 ROW_PREVIEW_CHARS: int = 4000
-
-
-def tool_text(content) -> str:
-    """The text a tool returned, out of whichever shape it came back in.
-
-    Local tools return a string. MCP tools return a list of content blocks, and
-    str() on that gives a python repr -- newlines escaped, so the whole result
-    lands on one line and wrapping it is what locks the screen up.
-    """
-
-    if isinstance(content, list):
-        return "\n".join(
-            block.get("text", "") if isinstance(block, dict) else str(block)
-            for block in content
-        )
-    return str(content or "")
 
 
 def preview(text: str) -> str:
@@ -269,6 +257,145 @@ class AssistantTurn(Vertical):
         await self.close_round()
 
 
+class DiffScreen(ModalScreen[None]):
+    """The whole diff, for when the card's summary is not enough to judge by.
+
+    Read-only: the decision is still taken on the card underneath. Rich already
+    colours a unified diff, so there is nothing to write here but the frame.
+    """
+
+    BINDINGS = [("escape,q,enter", "close", "close")]
+
+    def __init__(self, preview: WritePreview) -> None:
+        super().__init__()
+        self.preview = preview
+
+    def compose(self) -> ComposeResult:
+        body = Static(classes="diff-body")
+        if self.preview.diff:
+            body.update(Syntax(self.preview.diff, "diff", word_wrap=True,
+                               theme="ansi_dark", background_color="default"))
+        else:
+            body.update(self.preview.note or "(nothing to show)")
+        yield Vertical(
+            Static(f"{self.preview.tool} · {self.preview.path}", classes="modal-title"),
+            VerticalScroll(body),
+            Static("esc close", classes="modal-hint"),
+            classes="modal modal-wide",
+        )
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
+class ReasonScreen(ModalScreen[str | None]):
+    """A line of explanation to send back with a refusal.
+
+    Refusing without one leaves the model guessing why, and guessing usually
+    means trying the same write again in a slightly different shape.
+    """
+
+    BINDINGS = [("escape", "cancel", "cancel")]
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Static("why are you refusing this write?", classes="modal-title"),
+            Input(placeholder="the model reads this", id="reason"),
+            Static("enter send · esc back", classes="modal-hint"),
+            classes="modal",
+        )
+
+    def on_mount(self) -> None:
+        self.query_one("#reason", Input).focus()
+
+    @on(Input.Submitted, "#reason")
+    def submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value.strip() or None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class WriteCard(Vertical):
+    """One pending write, waiting on a person.
+
+    The graph is interrupted while this is on screen, so nothing has touched the
+    vault yet and nothing will until decision() resolves. It settles in place
+    afterwards rather than disappearing, so the transcript keeps a record of
+    what was allowed and what was not.
+    """
+
+    BINDINGS = [
+        ("a", "approve", "approve"),
+        ("r", "reject", "reject"),
+        ("R", "reject_with_reason", "reject with a reason"),
+        Binding("enter", "show_diff", "diff", priority=True),
+        ("escape", "reject", "reject"),
+    ]
+
+    can_focus = True
+
+    def __init__(self, preview: WritePreview) -> None:
+        super().__init__(classes="writecard -pending")
+        self.preview = preview
+        self._decided: asyncio.Future = asyncio.get_running_loop().create_future()
+
+    def compose(self) -> ComposeResult:
+        yield Static(f"✎ {self.preview.tool}  {self.preview.path}", classes="write-head")
+        yield Static(self.preview.summary, classes="write-summary")
+        if self.preview.note:
+            yield Static(self.preview.note, classes="write-note")
+        hint = "a approve · r reject · R reject with a reason"
+        if self.preview.diff:
+            hint = "enter diff · " + hint
+        yield Static(hint, classes="write-hint")
+
+    def on_mount(self) -> None:
+        self.focus()
+
+    async def decision(self) -> dict:
+        """Block the turn here until someone says yes or no."""
+
+        return await self._decided
+
+    def _settle(self, decision: dict, mark: str, style: str) -> None:
+        if self._decided.done():
+            return
+        self.remove_class("-pending")
+        self.add_class(style)
+        self.query_one(".write-hint", Static).update(mark)
+        self._decided.set_result(decision)
+
+    def abandon(self) -> None:
+        """Give the card up without deciding it, when the turn is stopped.
+
+        Counts as a refusal, because a write nobody approved is a write that
+        does not happen. The graph is still parked on its interrupt; the next
+        turn clears that before sending anything.
+        """
+
+        self._settle({"type": "reject"}, "⏹ left undecided", "-error")
+
+    def action_approve(self) -> None:
+        self._settle({"type": "approve"}, "✓ approved", "-ok")
+
+    def action_reject(self) -> None:
+        self._settle({"type": "reject"}, "✕ refused", "-error")
+
+    @work
+    async def action_reject_with_reason(self) -> None:
+        reason = await self.app.push_screen_wait(ReasonScreen())
+        decision = {"type": "reject"}
+        if reason:
+            decision["message"] = reason
+        self._settle(decision, f"✕ refused · {reason or 'no reason given'}", "-error")
+
+    @work
+    async def action_show_diff(self) -> None:
+        await self.app.push_screen_wait(DiffScreen(self.preview))
+        self.focus()
+
+
 class PromptArea(TextArea):
     """The prompt box: soft-wrapped, and it grows instead of scrolling sideways.
 
@@ -471,13 +598,16 @@ class LlmTui(App):
     ]
 
     def __init__(self, agent, model, sqlite_connection, agent_thread_config,
-                 mcp_status: MCPStatus) -> None:
+                 mcp_status: MCPStatus, note_reader=None) -> None:
         super().__init__()
         self.agent = agent
         self.model = model
         self.sqlite_connection = sqlite_connection
         self.agent_thread_config = agent_thread_config
         self.mcp_status = mcp_status
+        # reads a note so a pending write can be shown as a diff. None when the
+        # vault is not there, and the approval still happens either way
+        self.note_reader = note_reader
         self._turn_started = 0.0
         self._out_chars = 0
 
@@ -532,20 +662,34 @@ class LlmTui(App):
         self._out_chars = 0
 
         try:
-            stream = await self.agent.astream_events(
-                {"messages": [HumanMessage(text)]},
-                config=self.agent_thread_config,
-                version="v3",
-            )
-            await asyncio.gather(
-                self._pump_messages(stream, turn),
-                self._pump_tools(stream, turn),
-            )
+            await self._settle_pending_writes()
+            payload = {"messages": [HumanMessage(text)]}
+            # a turn is one pass unless a write needs approving. every approval
+            # interrupts the graph, so the turn is really: run until it stops,
+            # ask, resume, and again until it stops without asking
+            while True:
+                stream = await self.agent.astream_events(
+                    payload, config=self.agent_thread_config, version="v3",
+                )
+                await asyncio.gather(
+                    self._pump_messages(stream, turn),
+                    self._pump_tools(stream, turn),
+                )
+                interrupts = await stream.interrupts()
+                if not interrupts:
+                    break
+                decisions = await self._review_writes(interrupts, turn)
+                payload = Command(resume={"decisions": decisions})
         except asyncio.CancelledError:
+            # a waiting card holds the focus, so a stopped turn has to hand it
+            # back or the prompt cannot be typed into again
+            for card in turn.query(WriteCard):
+                card.abandon()
+            self.query_one("#prompt", PromptArea).focus()
             await turn.note("⏹ stopped · esc pressed", classes="note stopped")
             raise
         except Exception as exc:
-            await turn.note(f"✕ {type(exc).__name__}: {exc}", classes="note failed")
+            await turn.note(await self._explain_failure(exc), classes="note failed")
         finally:
             await turn.finish()
 
@@ -560,6 +704,102 @@ class LlmTui(App):
             # a failed title is not worth losing the turn over
             pass
         self.status.set_state("ready")
+
+    async def _explain_failure(self, exc: Exception) -> str:
+        """Name the write the model was setting up, when it was setting one up.
+
+        These break while a write is being put together, and the exception is
+        the model complaining about its own request -- it says nothing about
+        the vault, which is the part the reader actually wants to know about.
+        """
+
+        detail = f"✕ {type(exc).__name__}: {exc}"
+
+        try:
+            messages = (
+                await self.agent.aget_state(self.agent_thread_config)
+            ).values["messages"]
+        except Exception:
+            return detail
+
+        # only the newest assistant message matters -- an older write in the
+        # same thread has already been decided and is not what broke
+        newest = next((m for m in reversed(messages) if isinstance(m, AIMessage)), None)
+        if newest is None:
+            return detail
+
+        writes = [c for c in newest.tool_calls if c["name"] in WRITE_TOOLS]
+        if not writes:
+            return detail
+
+        asked = ", ".join(
+            f"{call['name']} on {call['args'].get('path') or '?'}" for call in writes
+        )
+        return (f"{detail}\n"
+                f"   this broke while setting up {asked}\n"
+                f"   the vault was not touched -- nothing runs before you approve it")
+
+    async def _review_writes(self, interrupts, turn: AssistantTurn) -> list[dict]:
+        """One card at a time, and one decision back for each write asked about.
+
+        The middleware raises unless it gets exactly as many decisions as it
+        asked for, in the order it asked, so this walks the requests rather than
+        collecting whatever the cards happen to produce.
+        """
+
+        self.status.set_state("approve?")
+        decisions: list[dict] = []
+
+        for pending in interrupts:
+            request = getattr(pending, "value", pending) or {}
+            for action in request.get("action_requests", []):
+                preview = await preview_write(
+                    action["name"], action.get("args") or {}, self.note_reader
+                )
+                self.transcript.anchor()
+                card = WriteCard(preview)
+                await turn.mount(card)
+                decisions.append(await card.decision())
+
+        self.query_one("#prompt", PromptArea).focus()
+        self.status.set_state("thinking")
+        return decisions
+
+    async def _settle_pending_writes(self) -> None:
+        """Refuse anything left hanging from a turn that never finished.
+
+        Stopping with esc, a crash, or loading a thread that was mid-approval
+        all leave the graph parked on an interrupt. Sending a new message into
+        that would resume it with no decision at all, so the safe reading of an
+        abandoned write is that it was not approved.
+        """
+
+        try:
+            state = await self.agent.aget_state(self.agent_thread_config)
+        except Exception:
+            return
+
+        pending = getattr(state, "interrupts", None) or []
+        wanted = 0
+        for item in pending:
+            request = getattr(item, "value", item) or {}
+            wanted += len(request.get("action_requests", []))
+        if not wanted:
+            return
+
+        refusals = []
+        for _ in range(wanted):
+            refusals.append({
+                "type": "reject",
+                "message": "The turn was interrupted before this was approved, "
+                           "so it was not run. Ask again if it is still wanted.",
+            })
+        stream = await self.agent.astream_events(
+            Command(resume={"decisions": refusals}),
+            config=self.agent_thread_config,
+            version="v3",
+        )
+        await stream.output()
 
     async def _pump_messages(self, stream, turn: AssistantTurn) -> None:
         """Reasoning and answer deltas, in the shape the sync renderer used."""

@@ -119,6 +119,38 @@ Screen {
     padding: 0;
 }
 
+/* ---------- pending writes ---------- */
+
+.writecard {
+    height: auto;
+    margin: 1 0;
+    padding: 0 1;
+    border-left: thick $warning;
+    background: transparent;
+}
+
+.writecard.-ok    { border-left: thick $success; }
+.writecard.-error { border-left: thick $error; }
+
+.writecard:focus-within,
+.writecard:focus { background: $boost; }
+
+.write-head    { text-style: bold; color: $warning; }
+.writecard.-ok    .write-head { color: $success; }
+.writecard.-error .write-head { color: $error; }
+
+.write-summary { color: $text; }
+.write-note    { color: $text-muted; text-style: italic; }
+.write-hint    { color: $text-muted; }
+
+.diff-body {
+    height: auto;
+    padding: 0 1;
+    background: transparent;
+}
+
+.modal-wide { width: 110; }
+
 /* ---------- modals ---------- */
 
 ModalScreen {

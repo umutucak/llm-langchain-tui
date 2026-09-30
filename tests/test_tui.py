@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
-from langchain.messages import AIMessage, HumanMessage
+from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain.agents import create_agent
 from langchain.tools import tool
 
@@ -27,7 +27,7 @@ from llmtui.middleware import route_tool_error
 from llmtui.tools.mcp import MCPStatus
 from llmtui.tui import (
     ROW_PREVIEW_CHARS, AssistantTurn, LlmTui, PromptArea, SessionPicker, StatusBar,
-    ToolRow, compact, meter,
+    DiffScreen, ToolRow, WriteCard, compact, meter,
 )
 
 
@@ -998,7 +998,207 @@ async def case_empty_search():
         ])
 
 
+# ---- 20. a write waits for a person, and a refused one never runs ----
+WROTE: list = []
+
+
+async def note_reader_stub(path, **target):
+    """The injected note reader for previews: one note, always readable."""
+    return "old line\n"
+
+
+def build_write_app(responses, note_reader=note_reader_stub):
+    """The real build_agent, so the gate under test is the one that ships."""
+    from llmtui.agent import build_agent
+
+    WROTE.clear()
+
+    @tool
+    async def vault_write(path: str, content: str) -> str:
+        """Overwrite a note."""
+        WROTE.append(path)
+        return "written"
+
+    @tool
+    async def vault_read(path: str) -> str:
+        """Read a note."""
+        return "old line\n"
+
+    connection = sqlite3.connect(":memory:", check_same_thread=False)
+    connection.execute("CREATE TABLE sessions (thread_id TEXT PRIMARY KEY, title TEXT,"
+                       " created_at TEXT, updated_at TEXT)")
+    agent = build_agent(ScriptedModel(responses=list(responses)), MemorySaver(),
+                        [vault_write, vault_read])
+    return LlmTui(agent, None, connection,
+                  {"configurable": {"thread_id": str(uuid.uuid4())}},
+                  MCPStatus(), note_reader=note_reader)
+
+
+async def case_write_rejected():
+    app = build_write_app([
+        ai_calls([("vault_write", {"path": "note.md", "content": "new line\n"})]),
+        ai_text("Understood, I left the note alone."),
+    ])
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "rewrite my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        cards = list(app.query(WriteCard))
+        card_before = cards[0] if cards else None
+        summary = str(card_before.preview.summary) if card_before else ""
+        pending = card_before.has_class("-pending") if card_before else False
+
+        await pilot.press("r")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        check("20  a write waits, and refusing it means it never runs", [
+            ("the write did not run while the card was up", pending and not WROTE),
+            ("the card was raised before anything happened", card_before is not None),
+            ("it says what would change", summary == "+1 -1 in note.md"),
+            # the whole point: the tool is never invoked
+            ("refusing means the tool is never invoked", not WROTE),
+            ("the card settles as refused", card_before.has_class("-error")),
+            ("the model was told", any(
+                isinstance(m, ToolMessage) and "rejected" in str(m.content).lower()
+                for m in (await app.agent.aget_state(app.agent_thread_config)).values["messages"])),
+            ("the turn still finished", len(list(app.query(Markdown))) == 1),
+        ])
+
+
+# ---- 21. approving lets exactly the same call through ----
+async def case_write_approved():
+    app = build_write_app([
+        ai_calls([("vault_write", {"path": "note.md", "content": "new line\n"})]),
+        ai_text("Done, the note is updated."),
+    ])
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "rewrite my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        wrote_before = list(WROTE)
+        await pilot.press("a")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        cards = list(app.query(WriteCard))
+        rows = list(app.query(ToolRow))
+
+        check("21  approving runs the write that was shown", [
+            ("nothing ran before the key was pressed", wrote_before == []),
+            ("the tool ran once, on the path from the card", WROTE == ["note.md"]),
+            ("the card settles as approved", cards and cards[0].has_class("-ok")),
+            ("a tool row appears for the resumed call", len(rows) == 1),
+            ("the turn produced an answer", len(list(app.query(Markdown))) == 1),
+        ])
+
+
+# ---- 22. an ungated tool is not held up ----
+async def case_read_not_gated():
+    app = build_write_app([
+        ai_calls([("vault_read", {"path": "note.md"})]),
+        ai_text("Here is what it says."),
+    ])
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "read my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        check("22  reading a note is not held at the gate", [
+            ("no card is raised", len(list(app.query(WriteCard))) == 0),
+            ("the read just happened", len(list(app.query(ToolRow))) == 1),
+            ("and answered", len(list(app.query(Markdown))) == 1),
+        ])
+
+
+# ---- 23. the full diff is one keypress from the card ----
+async def case_write_diff_screen():
+    app = build_write_app([
+        ai_calls([("vault_write", {"path": "note.md", "content": "new line\n"})]),
+        ai_text("Left alone."),
+    ])
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "rewrite my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        await pilot.press("enter")
+        await asyncio.sleep(0.4)
+        await pilot.pause()
+        opened = isinstance(app.screen, DiffScreen)
+        # the body holds a rich Syntax, so the diff is on the renderable itself
+        body = app.screen.query_one(".diff-body").content if opened else None
+        shown = getattr(body, "code", "")
+
+        await pilot.press("escape")
+        await asyncio.sleep(0.4)
+        await pilot.pause()
+        closed = not isinstance(app.screen, DiffScreen)
+
+        await pilot.press("r")
+        await asyncio.sleep(1.0)
+        await pilot.pause()
+
+        check("23  the card opens into the whole diff", [
+            ("enter opens the diff", opened),
+            ("the removed line is in it", "-old line" in shown),
+            ("the added line is in it", "+new line" in shown),
+            ("esc puts it away", closed),
+            ("reading the diff decides nothing on its own", not WROTE),
+        ])
+
+
+# ---- 24. a decision abandoned mid-turn does not leave the write armed ----
+async def case_write_abandoned():
+    # esc cancels the worker while the graph sits parked on the interrupt. the
+    # next message must not resume that write by accident, so it is refused
+    # before anything new is sent
+    app = build_write_app([
+        ai_calls([("vault_write", {"path": "note.md", "content": "new line\n"})]),
+        ai_text("Fine, left alone."),
+    ])
+    async with app.run_test() as pilot:
+        app.query_one("#prompt").text = "rewrite my note"
+        await pilot.press("enter")
+        await asyncio.sleep(1.2)
+        await pilot.pause()
+
+        card_up = len(list(app.query(WriteCard))) == 1
+        # esc reaches the card, not the app, so cancel the worker directly --
+        # which is what a crash or a reload would look like too
+        app.workers.cancel_group(app, "turn")
+        await asyncio.sleep(0.5)
+        await pilot.pause()
+
+        parked = (await app.agent.aget_state(app.agent_thread_config)).interrupts
+
+        app.query_one("#prompt").text = "never mind, what does it say?"
+        await pilot.press("enter")
+        await asyncio.sleep(1.4)
+        await pilot.pause()
+
+        settled = (await app.agent.aget_state(app.agent_thread_config)).interrupts
+
+        check("24  an abandoned decision is refused, not resumed", [
+            ("the card was up when the turn was dropped", card_up),
+            ("the graph really was left parked on it", len(parked) == 1),
+            ("the write still never ran", not WROTE),
+            ("the next turn cleared the interrupt", not settled),
+        ])
+
+
 async def main():
+    await case_write_diff_screen()
+    await case_write_abandoned()
+    await case_write_rejected()
+    await case_write_approved()
+    await case_read_not_gated()
     await case_empty_search()
     await case_mcp_row_body()
     await case_build_agent()

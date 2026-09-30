@@ -10,7 +10,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from llmtui.agent import build_agent, build_model
 from llmtui.config import SQLITE_DB_PATH
 from llmtui.sessions import connect
-from llmtui.tools.mcp import MCPStatus, get_mcp_tools
+from llmtui.tools.mcp import MCPStatus, get_mcp_tools, vault_reader
 from llmtui.tui import LlmTui
 
 # announces that its beta, so we shush it
@@ -39,6 +39,10 @@ async def main_async() -> None:
         mcp_status = MCPStatus()
         mcp_tools = await get_mcp_tools(mcp_status)
 
+        # the tui shows a pending write as a diff, which means reading the note
+        # first. None when the vault never answered, and the approval still runs
+        note_reader = vault_reader(mcp_tools)
+
         agent = build_agent(model, memory, mcp_tools)
 
         agent_thread_config = {
@@ -48,7 +52,8 @@ async def main_async() -> None:
         }
 
         await LlmTui(
-            agent, model, sqlite_connection, agent_thread_config, mcp_status
+            agent, model, sqlite_connection, agent_thread_config, mcp_status,
+            note_reader
         ).run_async()
 
 
