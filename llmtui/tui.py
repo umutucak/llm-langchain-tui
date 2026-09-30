@@ -662,8 +662,17 @@ class LlmTui(App):
         self._out_chars = 0
 
         try:
-            await self._settle_pending_writes()
+            refusals = await self._pending_refusals()
             payload = {"messages": [HumanMessage(text)]}
+            if refusals:
+                # a parked write from an abandoned turn is refused in the same
+                # resume that carries the user's next message, so the model
+                # answers once instead of emitting an unseen reply to the
+                # rejection first
+                payload = Command(
+                    resume={"decisions": refusals},
+                    update={"messages": [HumanMessage(text)]},
+                )
             # a turn is one pass unless a write needs approving. every approval
             # interrupts the graph, so the turn is really: run until it stops,
             # ask, resume, and again until it stops without asking
@@ -765,19 +774,23 @@ class LlmTui(App):
         self.status.set_state("thinking")
         return decisions
 
-    async def _settle_pending_writes(self) -> None:
-        """Refuse anything left hanging from a turn that never finished.
+    async def _pending_refusals(self) -> list[dict]:
+        """Refusals for anything left hanging from a turn that never finished.
 
         Stopping with esc, a crash, or loading a thread that was mid-approval
         all leave the graph parked on an interrupt. Sending a new message into
         that would resume it with no decision at all, so the safe reading of an
         abandoned write is that it was not approved.
+
+        Returns the decisions rather than resuming here: the caller folds them
+        into the same resume that carries the user's next message, so the model
+        answers once instead of emitting a discarded reply to the rejection.
         """
 
         try:
             state = await self.agent.aget_state(self.agent_thread_config)
         except Exception:
-            return
+            return []
 
         pending = getattr(state, "interrupts", None) or []
         wanted = 0
@@ -785,21 +798,13 @@ class LlmTui(App):
             request = getattr(item, "value", item) or {}
             wanted += len(request.get("action_requests", []))
         if not wanted:
-            return
+            return []
 
-        refusals = []
-        for _ in range(wanted):
-            refusals.append({
-                "type": "reject",
-                "message": "The turn was interrupted before this was approved, "
-                           "so it was not run. Ask again if it is still wanted.",
-            })
-        stream = await self.agent.astream_events(
-            Command(resume={"decisions": refusals}),
-            config=self.agent_thread_config,
-            version="v3",
-        )
-        await stream.output()
+        return [{
+            "type": "reject",
+            "message": "The turn was interrupted before this was approved, "
+                       "so it was not run. Ask again if it is still wanted.",
+        } for _ in range(wanted)]
 
     async def _pump_messages(self, stream, turn: AssistantTurn) -> None:
         """Reasoning and answer deltas, in the shape the sync renderer used."""

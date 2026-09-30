@@ -1161,7 +1161,7 @@ async def case_write_abandoned():
     # before anything new is sent
     app = build_write_app([
         ai_calls([("vault_write", {"path": "note.md", "content": "new line\n"})]),
-        ai_text("Fine, left alone."),
+        ai_text("Here is what it says."),
     ])
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "rewrite my note"
@@ -1185,11 +1185,23 @@ async def case_write_abandoned():
 
         settled = (await app.agent.aget_state(app.agent_thread_config)).interrupts
 
+        # the refusal must be folded into the next turn's resume, not settled
+        # first: exactly two AIMessages total (the parked write, then one
+        # answer), and the last one is the reply to the new message
+        messages = (await app.agent.aget_state(app.agent_thread_config)).values["messages"]
+        ai_count = sum(1 for m in messages if isinstance(m, AIMessage))
+        final_text = "".join(
+            block.get("text", "") for block in messages[-1].content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+
         check("24  an abandoned decision is refused, not resumed", [
             ("the card was up when the turn was dropped", card_up),
             ("the graph really was left parked on it", len(parked) == 1),
             ("the write still never ran", not WROTE),
             ("the next turn cleared the interrupt", not settled),
+            ("exactly one model reply, the answer to the next message", ai_count == 2),
+            ("the turn answered instead of failing", final_text.strip() != ""),
         ])
 
 
