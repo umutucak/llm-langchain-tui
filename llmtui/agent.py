@@ -1,7 +1,9 @@
 """The agent itself: model, tools, middleware stack, checkpointer."""
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
+from langchain.agents.middleware import (
+    HumanInTheLoopMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware,
+)
 
 from langchain_core.tools.base import BaseTool
 
@@ -22,6 +24,7 @@ from llmtui.config import (
 )
 from llmtui.middleware import repair_tool_calls, route_tool_error
 from llmtui.tools import TOOLS
+from llmtui.tools.mcp import WRITE_TOOLS
 
 with open(SYSTEM_PROMPT_PATH, 'r') as f:
     SYSTEM_PROMPT: str = f.read()
@@ -51,10 +54,29 @@ def build_agent(
 
     mcp_names = {tool.name for tool in mcp_tools}
 
+    # only the write tools that actually loaded, so an obsidian that is down
+    # cannot leave the gate holding names no tool answers to
+    gated = WRITE_TOOLS & mcp_names
+
+    # goes in front, which by the rule below means it runs last, and that is the
+    # point: the writes it holds up are the repaired ones, and the ones the call
+    # limit already let through. asking about a call another middleware is about
+    # to rewrite or drop would be asking about nothing
+    approval = []
+    if gated:
+        interrupt_on = {}
+        for name in gated:
+            interrupt_on[name] = {"allowed_decisions": ["approve", "reject"]}
+        approval.append(HumanInTheLoopMiddleware(interrupt_on=interrupt_on))
+
     return create_agent(
         model=model,
         tools=TOOLS+mcp_tools,
-        middleware=[
+        # after_model hooks run in reverse list order: repair_tool_calls first,
+        # then the call limit, then the approval gate last -- so the gate only
+        # ever sees repaired calls the limit already let through. the tool-error
+        # wrapper runs around the tool node, after all of them
+        middleware=approval + [
             ToolCallLimitMiddleware(
                 tool_name="search_books",
                 run_limit=MAX_TOOL_CALLS
