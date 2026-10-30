@@ -9,7 +9,7 @@ dependencies = [
     "langgraph==1.2.11",
     "langchain-ollama==1.1.0",
     "grandalf==0.8",
-    "langgraph-checkpoint-sqlite==3.1.1",
+    "langgraph-checkpoint-sqlite==3.1.2",
     "langchain-milvus==0.4.0",
     "milvus-lite==3.2.0",
     "pymilvus==3.0.1",
