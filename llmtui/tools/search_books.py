@@ -70,30 +70,47 @@ RRF_K = 60
 
 # has to mirror the schema ingest.py builds, or the collection won't load.
 # BM25 is exact-term only here -- see the note in ingest.py
-vector_store = Milvus(
-    embedding_function=build_embeddings(_pick_embedding_entry()),
-    builtin_function=BM25BuiltInFunction(),
-    vector_field=["dense", "sparse"],
-    # must match ingest.py -- see the note there on why SPARSE_INVERTED_INDEX
-    # is spelled out instead of letting BM25 default to AUTOINDEX
-    index_params=[
-        {
-            "metric_type": DENSE_METRIC_TYPE,
-            "index_type": DENSE_INDEX_TYPE,
-            "params": {},
-        },
-        {
-            "metric_type": SPARSE_METRIC_TYPE,
-            "index_type": SPARSE_INDEX_TYPE,
-            "params": {},
-        },
-    ],
-    # milvus grpc sends keep_alive messages, adding noise to the frontend
-    connection_args={"uri": MILVUS_DB, "grpc_options": MILVUS_GRPC_OPTIONS},
-    # we never read ids back, so let milvus mint them: also silences the
-    # "No ids provided and auto_id is False" UserWarning on every add
-    auto_id=True,
-)
+_store: Milvus | None = None
+
+
+def vector_store() -> Milvus:
+    """The live store, built on the first search and kept from then on.
+
+    Built here rather than at import: importing this module must not need an
+    ingested store or a models.json (the TUI and the tests import it), and
+    building opens a milvus-lite server that then holds the db dir open for
+    the life of the process.
+    """
+
+    global _store
+    if _store is None:
+        _store = Milvus(
+            embedding_function=build_embeddings(_pick_embedding_entry()),
+            builtin_function=BM25BuiltInFunction(),
+            vector_field=["dense", "sparse"],
+            # must match ingest.py -- see the note there on why
+            # SPARSE_INVERTED_INDEX is spelled out instead of letting BM25
+            # default to AUTOINDEX
+            index_params=[
+                {
+                    "metric_type": DENSE_METRIC_TYPE,
+                    "index_type": DENSE_INDEX_TYPE,
+                    "params": {},
+                },
+                {
+                    "metric_type": SPARSE_METRIC_TYPE,
+                    "index_type": SPARSE_INDEX_TYPE,
+                    "params": {},
+                },
+            ],
+            # milvus grpc sends keep_alive messages, adding noise to the frontend
+            connection_args={"uri": MILVUS_DB, "grpc_options": MILVUS_GRPC_OPTIONS},
+            # we never read ids back, so let milvus mint them: also silences the
+            # "No ids provided and auto_id is False" UserWarning on every add
+            auto_id=True,
+        )
+    return _store
+
 
 # https://milvus.io/docs/rrf-ranker.md
 # reranker to merge the proposed candidates from the dense and sparse search returns
@@ -165,7 +182,7 @@ def search_books(query: str, book: str = "") -> tuple[str, dict]:
         kwargs["expr"] = f'source like "{book_pattern(book)}"'
 
     # hybrid search using dense semantic similarity + bm25 sparse search merged and reranked with rrf
-    results = vector_store.similarity_search(query, **kwargs)
+    results = vector_store().similarity_search(query, **kwargs)
 
     # sending back prompt that explains why a result was not found
     if not results:
