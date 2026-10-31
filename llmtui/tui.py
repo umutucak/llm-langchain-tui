@@ -1149,7 +1149,7 @@ class LlmTui(App):
 
         watching: list[asyncio.Task] = []
         async for tc in stream.tool_calls:
-            self.status.set_state("searching")
+            self.status.set_state("tooling")
             row = await turn.add_tool(tc.tool_call_id, tc.tool_name, tc.input)
             watching.append(asyncio.create_task(self._watch_tool(tc, row)))
         if watching:
