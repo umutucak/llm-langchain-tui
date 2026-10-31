@@ -13,10 +13,10 @@ behind a Textual TUI, with RAG over a PDF library and Obsidian vault tools over 
 ## Run it (Python 3.12)
 
 ```bash
-uv sync                                # creates .venv with python 3.12 and installs pinned deps
-uv run python app.py                   # the chat TUI
-uv run python scripts/ingest.py <pdf_dir>   # build the vector store (dev db first)
-uv run python scripts/inspect_context.py    # dump a thread's context as HTML for debugging
+uv sync                                     # creates .venv with dependencies
+uv run python app.py                        # the chat TUI
+uv run python scripts/ingest.py <pdf_dir>   # build the vector store
+uv run python scripts/inspect_context.py    # dump a thread's context as HTML
 ```
 
 ## CI, formatting, and the pre-commit hook
@@ -77,9 +77,9 @@ uv run python scripts/inspect_context.py    # dump a thread's context as HTML fo
   LangGraph's checkpoint tables; model names its own threads.
 - `scripts/` — async support tasks run straight from a shell. They insert the project
   root onto `sys.path` themselves before importing `llmtui`.
-  - `ingest.py`: PDFs → Milvus live db (hybrid dense+BM25). A preexisting store
-    is moved to `db/backups/` (last-1 kept) before rebuilding; `restore.py`
-    swaps a backup back into place.
+  - `ingest.py`: PDFs → Milvus live db (hybrid dense+BM25). A preexisting store is moved
+    to `db/backups/` (last-1 kept) before rebuilding; `restore.py` swaps a backup back
+    into place.
   - `inspect_context.py`: renders a checkpointed thread as a self-contained HTML page in
     `resources/context_inspection/`.
 
