@@ -6,7 +6,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from milvus_lite.server_manager import server_manager_instance
+from pymilvus import DataType, MilvusClient
+
 from llmtui import store_backup
+from llmtui.config import MILVUS_COLLECTION_NAME
 
 results = {}
 
@@ -82,6 +86,34 @@ with tempfile.TemporaryDirectory() as t:
                 "missing backup dir lists empty",
                 store_backup.list_backups(tmp / "no") == [],
             ),
+        ],
+    )
+
+# ---- 5. the move leaves no milvus-lite server holding the old path ----
+# a server left running keeps the moved-away db open and writes its dirs back
+# into the old location on the next use (issue #27)
+with tempfile.TemporaryDirectory() as t:
+    tmp = Path(t)
+    live = tmp / "milvus.db"
+
+    client = MilvusClient(uri=str(live))
+    schema = client.create_schema(auto_id=True)
+    schema.add_field("id", DataType.INT64, is_primary=True)
+    schema.add_field("dense", DataType.FLOAT_VECTOR, dim=4)
+    client.create_collection(MILVUS_COLLECTION_NAME, schema=schema)
+    client.close()
+
+    store_backup.backup_store(live, tmp / "backups")
+    held = {Path(path).resolve() for path in server_manager_instance._servers}
+    reopened = MilvusClient(uri=str(live))
+    stale = reopened.has_collection(MILVUS_COLLECTION_NAME)
+    reopened.close()
+    store_backup._close_server(live)
+    check(
+        "the move leaves no server holding the live path",
+        [
+            ("no server still holds the live path", live.resolve() not in held),
+            ("a reconnect gets a fresh store, not the moved-away one", not stale),
         ],
     )
 

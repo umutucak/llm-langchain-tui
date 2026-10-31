@@ -30,11 +30,13 @@ from llmtui.config import (
 UNTAGGED = "untagged"
 
 
-def _close_server() -> None:
-    """Stop the embedded milvus-lite server for the live db, if any.
+def _close_server(path: str | Path = MILVUS_DB_PATH) -> None:
+    """Stop the embedded milvus-lite server for path, if any.
 
     client.close() only drops the connection; the in-process server thread
-    keeps the DB dir alive and recreates files on the next connection.
+    keeps the DB dir alive and recreates files on the next connection. So
+    every path a move or delete touches has to be released, not just the
+    live one.
     """
 
     try:
@@ -43,19 +45,21 @@ def _close_server() -> None:
         return
     # release_server keys its registry on os.path.abspath -- pass exactly that
     # form, or the lookup misses and the server keeps the DB dir alive
-    server_manager_instance.release_server(os.path.abspath(MILVUS_DB_PATH))
+    server_manager_instance.release_server(os.path.abspath(path))
 
 
-def _backup_name(backup_dir: Path) -> str:
-    """milvus-<timestamp>-<embedding-entry-name> for the live store.
+def _read_tag(path: Path) -> str:
+    """The embeddings entry name recorded on the store at path, or UNTAGGED.
 
-    The entry name comes from the collection property ingest writes, so a
-    glance at the backup folder shows which model built it.
+    Opens its own client, and stops the server that client started again
+    afterwards: a server left running holds the DB dir open and writes back
+    into it later, which is what kept the old db from being moved away
+    (issue #27).
     """
 
     name = UNTAGGED
     try:
-        client = MilvusClient(uri=MILVUS_DB_PATH, grpc_options=MILVUS_GRPC_OPTIONS)
+        client = MilvusClient(uri=str(path), grpc_options=MILVUS_GRPC_OPTIONS)
         try:
             if client.has_collection(MILVUS_COLLECTION_NAME):
                 desc = client.describe_collection(MILVUS_COLLECTION_NAME) or {}
@@ -66,8 +70,20 @@ def _backup_name(backup_dir: Path) -> str:
             client.close()
     except Exception:
         pass  # unreadable store is still backed up, just untagged
+    finally:
+        _close_server(path)
+    return name
+
+
+def _backup_name(tag: str) -> str:
+    """milvus-<timestamp>-<embedding-entry-name>.
+
+    The entry name comes from the collection property ingest writes, so a
+    glance at the backup folder shows which model built it.
+    """
+
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"milvus-{stamp}-{name}"
+    return f"milvus-{stamp}-{tag}"
 
 
 def backup_store(
@@ -87,12 +103,15 @@ def backup_store(
     backup_dir = Path(backup_dir)
     if not live.exists():
         raise FileNotFoundError(f"no live store at {live} to back up")
-    _close_server()
+    # read the tag and stop the server BEFORE the move: a client opened after
+    # the close starts a fresh server on this path, and the server then
+    # recreates its dirs there on the next use -- the move is no longer clean
+    tag = _read_tag(live)
     backup_dir.mkdir(parents=True, exist_ok=True)
     # prune first, then move: pruning after would keep the "newest" name and
     # could delete the backup we just made (same-second collision suffixes)
     _prune(backup_dir, keep=Path(keep) if keep else None)
-    dest = backup_dir / _backup_name(backup_dir)
+    dest = backup_dir / _backup_name(tag)
     while dest.exists():
         dest = backup_dir / f"{dest.name}-1"
     live.rename(dest)
@@ -106,6 +125,7 @@ def _prune(backup_dir: Path, keep: Path | None) -> None:
     for old in backups:
         if old == keep:
             continue
+        _close_server(old)
         if old.is_dir():
             shutil.rmtree(old)
         else:
@@ -128,20 +148,7 @@ def list_backups(backup_dir: str | Path = MILVUS_BACKUP_DIR) -> list[Backup]:
     for path in sorted(backup_dir.glob("milvus-*")):
         if not path.is_dir():
             continue
-        name = UNTAGGED
-        try:
-            client = MilvusClient(uri=str(path), grpc_options=MILVUS_GRPC_OPTIONS)
-            try:
-                if client.has_collection(MILVUS_COLLECTION_NAME):
-                    desc = client.describe_collection(MILVUS_COLLECTION_NAME) or {}
-                    value = (desc.get("properties") or {}).get(EMBEDDING_MODEL_KEY)
-                    if isinstance(value, str) and value:
-                        name = value
-            finally:
-                client.close()
-        except Exception:
-            pass
-        out.append(Backup(path=path, embedding_model=name))
+        out.append(Backup(path=path, embedding_model=_read_tag(path)))
     return out
 
 
@@ -163,6 +170,6 @@ def restore_backup(
         raise FileNotFoundError(f"no backup at {backup}")
     if live.exists():
         backup_store(live, backup_dir, keep=backup)
-    _close_server()
+    _close_server(backup)
     backup.rename(live)
     return live
