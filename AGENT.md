@@ -26,7 +26,8 @@ uv run python scripts/inspect_context.py    # dump a thread's context as HTML
 
 - `make format` reformats everything; `make lint` runs the exact checks CI runs
   (`.github/workflows/ci.yml`: ruff format --check, ruff check, mdformat --check --wrap
-  88). Same strings, so hook, CI, and local can't drift.
+  88). `make test` runs the whole suite (pytest over `tests/`). Same strings, so hook,
+  CI, and local can't drift.
 
 - A checked-in pre-commit hook runs `make lint` on every commit and blocks on failure.
   It needs one-time activation per clone: `git config core.hooksPath hooks`.
@@ -104,5 +105,7 @@ LangChain concerns into them.
   provider, and key. Read the message before guessing.
 - MCP failures are transport-level vs server-reported — `mcp.py` and
   `middleware/errors.py` distinguish and handle these deliberately.
-- Tests live in `tests/` (tui, middleware, tools, writes). Run them before handing
-  changes back.
+- Tests live in `tests/`, all of them pytest modules (`make test`). None of them need a
+  model server, an ingested store, or `config/models.json`: the TUI suite drives Textual
+  headlessly with a scripted model, and the vector store is built lazily, on the first
+  search. Run them before handing changes back.

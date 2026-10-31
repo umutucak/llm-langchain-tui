@@ -11,4 +11,7 @@ lint: ## check only (what CI runs)
 	uv run ruff check .
 	uv run mdformat --check --wrap 88 *.md
 
-.PHONY: format lint
+test: ## every test (what CI runs after lint)
+	uv run --with pytest python -m pytest tests
+
+.PHONY: format lint test

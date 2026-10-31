@@ -12,6 +12,8 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from langchain.agents import create_agent
@@ -41,6 +43,8 @@ from llmtui.tui import (
 
 class ScriptedModel(BaseChatModel):
     responses: list
+    # the app labels its chrome with the model's name
+    model_name: str = "scripted"
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
         return ChatResult(generations=[ChatGeneration(message=self.responses.pop(0))])
@@ -82,6 +86,31 @@ async def search_books(query: str, book: str = "") -> tuple[str, dict]:
     return text, {"passages": 2}
 
 
+# what app.py passes but a headless run never exercises: memory and mcp_tools
+# only matter to /model, and the entry is a stand-in that declares a context
+# window so the meter never reaches for models.json (CI has none)
+SCRIPTED_MODEL = SimpleNamespace(model_name="scripted")
+SCRIPTED_ENTRY = SimpleNamespace(
+    provider="scripted", id="scripted", context_window=8192
+)
+
+
+def tui_app(agent, model, connection, thread_config, mcp_status, note_reader=None):
+    """LlmTui wired up the way app.py wires it, minus the live server pieces."""
+
+    return LlmTui(
+        agent,
+        model or SCRIPTED_MODEL,
+        MemorySaver(),
+        [],
+        SCRIPTED_ENTRY,
+        connection,
+        thread_config,
+        mcp_status,
+        note_reader,
+    )
+
+
 def build_app(responses):
     connection = sqlite3.connect(":memory:", check_same_thread=False)
     connection.execute(
@@ -94,7 +123,7 @@ def build_app(responses):
         checkpointer=MemorySaver(),
     )
     config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-    return LlmTui(agent, None, connection, config, MCPStatus())
+    return tui_app(agent, None, connection, config, MCPStatus())
 
 
 async def ask(app, text, settle=1.4):
@@ -105,7 +134,7 @@ async def ask(app, text, settle=1.4):
         await pilot.pause()
         yield_state = {
             "tool_rows": list(app.query(ToolRow)),
-            "markdown": list(app.query(Markdown)),
+            "markdown": answer_blocks(app),
             "collapsibles": list(app.query(Collapsible)),
             "statics": [s for s in app.query(Static)],
             "status": app.status,
@@ -113,29 +142,32 @@ async def ask(app, text, settle=1.4):
         return yield_state
 
 
-results = {}
+def answer_blocks(app):
+    """Only the answer Markdown widgets: a tool row's body is one too."""
+
+    return [m for m in app.query(Markdown) if not m.has_class("passages")]
 
 
 def check(label, conditions):
-    ok = True
     print(f"\n{'=' * 66}\n{label}\n{'=' * 66}")
+    failed = [desc for desc, passed in conditions if not passed]
     for desc, passed in conditions:
         print(f"    {'PASS' if passed else 'FAIL'}  {desc}")
-        ok = ok and passed
-    results[label] = ok
+    assert not failed, f"{label}: {failed}"
 
 
 # ---- helpers are pure, check them first ----
-check(
-    "0  helpers",
-    [
-        ("meter fills proportionally", meter(16384, 32768) == "▓▓▓▓░░░░"),
-        ("meter clamps at full", meter(99999, 32768) == "▓▓▓▓▓▓▓▓"),
-        ("meter empty at zero", meter(0, 32768) == "░░░░░░░░"),
-        ("compact shortens thousands", compact(8100) == "8.1k"),
-        ("compact leaves small numbers", compact(412) == "412"),
-    ],
-)
+def test_helpers():
+    check(
+        "0  helpers",
+        [
+            ("meter fills proportionally", meter(16384, 32768) == "▓▓▓▓░░░░"),
+            ("meter clamps at full", meter(99999, 32768) == "▓▓▓▓▓▓▓▓"),
+            ("meter empty at zero", meter(0, 32768) == "░░░░░░░░"),
+            ("compact shortens thousands", compact(8100) == "8.1k"),
+            ("compact leaves small numbers", compact(412) == "412"),
+        ],
+    )
 
 
 # ---- 1. a turn with two searches ----
@@ -160,7 +192,7 @@ async def case_search():
         await pilot.pause()
 
         rows = list(app.query(ToolRow))
-        answers = list(app.query(Markdown))
+        answers = answer_blocks(app)
         turns = list(app.query(AssistantTurn))
         panes = list(turns[0].query(".reasoning")) if turns else []
 
@@ -214,7 +246,7 @@ async def case_plain():
             "2  no tools -> no rows, still answers",
             [
                 ("no tool rows", len(list(app.query(ToolRow))) == 0),
-                ("answer still rendered", len(list(app.query(Markdown))) == 1),
+                ("answer still rendered", len(answer_blocks(app)) == 1),
                 ("status ready", app.status.state == "ready"),
             ],
         )
@@ -242,7 +274,7 @@ async def case_error():
         tools=[search_books],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(
+    app = tui_app(
         agent,
         None,
         connection,
@@ -342,7 +374,7 @@ async def case_middleware():
         ],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(
+    app = tui_app(
         agent,
         None,
         connection,
@@ -373,9 +405,9 @@ async def case_middleware():
                 ),
                 (
                     "body shows the failure, not the model-facing guidance",
-                    rows and "GOAWAY" in str(rows[0]._body.content),
+                    rows and "GOAWAY" in str(rows[0]._body.source),
                 ),
-                ("run finished with an answer", len(list(app.query(Markdown))) == 1),
+                ("run finished with an answer", len(answer_blocks(app)) == 1),
             ],
         )
 
@@ -416,7 +448,7 @@ async def case_async_saver():
         # a separate model instance, because naming pops from its own script
         namer = ScriptedModel(responses=[AIMessage(content="Initiative Rules")])
         thread_id = str(uuid.uuid4())
-        app = LlmTui(
+        app = tui_app(
             agent,
             namer,
             connection,
@@ -442,7 +474,7 @@ async def case_async_saver():
                         app.status.state == "ready",
                     ),
                     ("tool row resolved", rows and rows[0].has_class("-ok")),
-                    ("answer rendered", len(list(app.query(Markdown))) == 1),
+                    ("answer rendered", len(answer_blocks(app)) == 1),
                     (
                         "checkpoint written to the file",
                         connection.execute(
@@ -483,7 +515,7 @@ async def case_load():
         )
         namer = ScriptedModel(responses=[AIMessage(content="Draw Steel Initiative")])
         first = str(uuid.uuid4())
-        app = LlmTui(
+        app = tui_app(
             agent,
             namer,
             connection,
@@ -537,7 +569,7 @@ async def case_load():
                         "the original question is back on screen",
                         restored and "initiative" in str(restored[0].content),
                     ),
-                    ("answer redrawn too", len(list(app.query(Markdown))) == 1),
+                    ("answer redrawn too", len(answer_blocks(app)) == 1),
                 ],
             )
         connection.close()
@@ -636,7 +668,7 @@ async def case_new_and_self_delete():
             ]
         )
         first = str(uuid.uuid4())
-        app = LlmTui(
+        app = tui_app(
             agent,
             namer,
             connection,
@@ -822,7 +854,7 @@ async def case_multi_round_reasoning():
                     and "words" in str(panes[0].title)
                     and str(panes[0].title) != str(panes[1].title),
                 ),
-                ("an answer block per round", len(list(app.query(Markdown))) == 2),
+                ("an answer block per round", len(answer_blocks(app)) == 2),
             ],
         )
 
@@ -1212,7 +1244,7 @@ async def case_mcp_row_body():
         tools=[vault_read],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(
+    app = tui_app(
         agent,
         None,
         connection,
@@ -1227,7 +1259,7 @@ async def case_mcp_row_body():
         await pilot.pause()
 
         rows = list(app.query(ToolRow))
-        body = str(rows[0]._body.content) if rows else ""
+        body = str(rows[0]._body.source) if rows else ""
         longest = max((len(line) for line in body.split("\n")), default=0)
 
         check(
@@ -1276,7 +1308,7 @@ async def case_empty_search():
         tools=[search_books],
         checkpointer=MemorySaver(),
     )
-    app = LlmTui(
+    app = tui_app(
         agent,
         None,
         connection,
@@ -1304,7 +1336,7 @@ async def case_empty_search():
                 ),
                 ("the title says so", "no passages" in title),
                 ("no invented passage count", "1 passage" not in title),
-                ("the run still answered", len(list(app.query(Markdown))) == 1),
+                ("the run still answered", len(answer_blocks(app)) == 1),
             ],
         )
 
@@ -1345,7 +1377,7 @@ def build_write_app(responses, note_reader=note_reader_stub):
         MemorySaver(),
         [vault_write, vault_read],
     )
-    return LlmTui(
+    return tui_app(
         agent,
         None,
         connection,
@@ -1399,7 +1431,7 @@ async def case_write_rejected():
                         ).values["messages"]
                     ),
                 ),
-                ("the turn still finished", len(list(app.query(Markdown))) == 1),
+                ("the turn still finished", len(answer_blocks(app)) == 1),
             ],
         )
 
@@ -1433,7 +1465,7 @@ async def case_write_approved():
                 ("the tool ran once, on the path from the card", WROTE == ["note.md"]),
                 ("the card settles as approved", cards and cards[0].has_class("-ok")),
                 ("a tool row appears for the resumed call", len(rows) == 1),
-                ("the turn produced an answer", len(list(app.query(Markdown))) == 1),
+                ("the turn produced an answer", len(answer_blocks(app)) == 1),
             ],
         )
 
@@ -1457,7 +1489,7 @@ async def case_read_not_gated():
             [
                 ("no card is raised", len(list(app.query(WriteCard))) == 0),
                 ("the read just happened", len(list(app.query(ToolRow))) == 1),
-                ("and answered", len(list(app.query(Markdown))) == 1),
+                ("and answered", len(answer_blocks(app)) == 1),
             ],
         )
 
@@ -1567,39 +1599,34 @@ async def case_write_abandoned():
         )
 
 
-async def main():
-    await case_write_diff_screen()
-    await case_write_abandoned()
-    await case_write_rejected()
-    await case_write_approved()
-    await case_read_not_gated()
-    await case_empty_search()
-    await case_mcp_row_body()
-    await case_build_agent()
-    await case_mcp_degrades()
-    await case_mcp_live_status()
-    await case_mcp_status_is_live()
-    await case_mcp_status_bar()
-    await case_footer_stacking()
-    await case_prompt_wraps()
-    await case_multi_round_reasoning()
-    await case_new_and_self_delete()
-    await case_scroll()
-    await case_search()
-    await case_plain()
-    await case_error()
-    await case_commands()
-    await case_middleware()
-    await case_async_saver()
-    await case_load()
-
-    print("\n" + "=" * 66)
-    print("SUMMARY")
-    print("=" * 66)
-    for label, ok in results.items():
-        print(f"  {'PASS' if ok else 'FAIL'}   {label}")
-    print(f"\n{sum(results.values())}/{len(results)} cases passed")
+CASES = [
+    case_write_diff_screen,
+    case_write_abandoned,
+    case_write_rejected,
+    case_write_approved,
+    case_read_not_gated,
+    case_empty_search,
+    case_mcp_row_body,
+    case_build_agent,
+    case_mcp_degrades,
+    case_mcp_live_status,
+    case_mcp_status_is_live,
+    case_mcp_status_bar,
+    case_footer_stacking,
+    case_prompt_wraps,
+    case_multi_round_reasoning,
+    case_new_and_self_delete,
+    case_scroll,
+    case_search,
+    case_plain,
+    case_error,
+    case_commands,
+    case_middleware,
+    case_async_saver,
+    case_load,
+]
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.__name__)
+def test_tui_case(case):
+    asyncio.run(case())

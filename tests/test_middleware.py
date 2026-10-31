@@ -219,303 +219,316 @@ def run(label, agent, expectations):
     return ok
 
 
-results = {}
-
-# ---- 1. concatenated JSON gets expanded into two real searches ----
-agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
-results["1 repair->2 calls"] = run(
-    "CASE 1  malformed concatenated args -> two executed searches",
-    agent,
-    lambda r: [
-        ("both queries executed", len(CALLS) == 2),
-        (
-            "two ToolMessages returned",
-            sum(isinstance(m, ToolMessage) for m in r["messages"]) == 2,
-        ),
-        (
-            "no invalid_tool_call block left in history",
-            all(
-                b.get("type") != "invalid_tool_call"
-                for m in r["messages"]
-                if isinstance(m, AIMessage)
-                for b in m.content
-                if isinstance(b, dict)
+def test_middleware_cases():
+    results = {}
+    # ---- 1. concatenated JSON gets expanded into two real searches ----
+    agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
+    results["1 repair->2 calls"] = run(
+        "CASE 1  malformed concatenated args -> two executed searches",
+        agent,
+        lambda r: [
+            ("both queries executed", len(CALLS) == 2),
+            (
+                "two ToolMessages returned",
+                sum(isinstance(m, ToolMessage) for m in r["messages"]) == 2,
             ),
-        ),
-        ("final message is text", r["messages"][-1].content[0].get("type") == "text"),
-    ],
-)
-
-# ---- 2. unrepairable -> turn handed back -> model reissues valid call ----
-agent = build(
-    [
-        ai_invalid(TRUNCATED),
-        ai_valid([("search_books", {"query": "grappling"})]),
-        ai_text("Recovered after retry."),
-    ]
-)
-results["2 jump back + retry"] = run(
-    "CASE 2  truncated args -> jump_to model -> model reissues correctly",
-    agent,
-    lambda r: [
-        ("model got a second chance and searched", CALLS == ["grappling"]),
-        (
-            "an error ToolMessage explained the problem",
-            any(
-                isinstance(m, ToolMessage) and m.status == "error"
-                for m in r["messages"]
+            (
+                "no invalid_tool_call block left in history",
+                all(
+                    b.get("type") != "invalid_tool_call"
+                    for m in r["messages"]
+                    if isinstance(m, AIMessage)
+                    for b in m.content
+                    if isinstance(b, dict)
+                ),
             ),
-        ),
-        (
-            "run completed with an answer",
-            r["messages"][-1].content[0].get("type") == "text",
-        ),
-    ],
-)
+            (
+                "final message is text",
+                r["messages"][-1].content[0].get("type") == "text",
+            ),
+        ],
+    )
 
-# ---- 3. loop guard: model keeps emitting garbage ----
-agent = build(
-    [
-        ai_invalid(TRUNCATED),
-        ai_invalid(TRUNCATED),
-        ai_invalid(TRUNCATED),
-        ai_invalid(TRUNCATED),
-    ]
-)
-results["3 loop guard"] = run(
-    "CASE 3  repeated unparseable args -> guard stops the loop",
-    agent,
-    lambda r: [
-        ("never executed a tool", CALLS == []),
-        (
-            "stopped at 2 hand-backs",
-            sum(
-                isinstance(m, ToolMessage)
-                and str(m.content).startswith("[malformed tool call]")
-                for m in r["messages"]
+    # ---- 2. unrepairable -> turn handed back -> model reissues valid call ----
+    agent = build(
+        [
+            ai_invalid(TRUNCATED),
+            ai_valid([("search_books", {"query": "grappling"})]),
+            ai_text("Recovered after retry."),
+        ]
+    )
+    results["2 jump back + retry"] = run(
+        "CASE 2  truncated args -> jump_to model -> model reissues correctly",
+        agent,
+        lambda r: [
+            ("model got a second chance and searched", CALLS == ["grappling"]),
+            (
+                "an error ToolMessage explained the problem",
+                any(
+                    isinstance(m, ToolMessage) and m.status == "error"
+                    for m in r["messages"]
+                ),
+            ),
+            (
+                "run completed with an answer",
+                r["messages"][-1].content[0].get("type") == "text",
+            ),
+        ],
+    )
+
+    # ---- 3. loop guard: model keeps emitting garbage ----
+    agent = build(
+        [
+            ai_invalid(TRUNCATED),
+            ai_invalid(TRUNCATED),
+            ai_invalid(TRUNCATED),
+            ai_invalid(TRUNCATED),
+        ]
+    )
+    results["3 loop guard"] = run(
+        "CASE 3  repeated unparseable args -> guard stops the loop",
+        agent,
+        lambda r: [
+            ("never executed a tool", CALLS == []),
+            (
+                "stopped at 2 hand-backs",
+                sum(
+                    isinstance(m, ToolMessage)
+                    and str(m.content).startswith("[malformed tool call]")
+                    for m in r["messages"]
+                )
+                == 2,
+            ),
+            ("terminated instead of looping forever", True),
+        ],
+    )
+
+    # ---- 4. tool raises -> ToolErrorMiddleware feeds it back ----
+    agent = build(
+        [
+            ai_valid([("search_books", {"query": "grapple"})]),
+            ai_text("Told the user the library is unavailable."),
+        ],
+        raises=True,
+    )
+    results["4 tool error"] = run(
+        "CASE 4  search_books raises -> error fed back, run survives",
+        agent,
+        lambda r: [
+            ("run did not crash", True),
+            (
+                "error surfaced as a ToolMessage",
+                any(
+                    isinstance(m, ToolMessage) and m.status == "error"
+                    for m in r["messages"]
+                ),
+            ),
+            (
+                "message names the exception type",
+                any(
+                    isinstance(m, ToolMessage) and "RuntimeError" in str(m.content)
+                    for m in r["messages"]
+                ),
+            ),
+            (
+                "message forbids answering from general knowledge",
+                any(
+                    isinstance(m, ToolMessage) and "general knowledge" in str(m.content)
+                    for m in r["messages"]
+                ),
+            ),
+        ],
+    )
+
+    # ---- 5. call limit blocks the 4th search in one turn ----
+    agent = build(
+        [
+            ai_valid([("search_books", {"query": f"q{i}"}) for i in range(4)]),
+            ai_text("Answered with what I had."),
+        ],
+        run_limit=3,
+    )
+    results["5 call limit"] = run(
+        "CASE 5  four searches in one turn with run_limit=3",
+        agent,
+        lambda r: [
+            ("at most 3 searches actually ran", len(CALLS) <= 3),
+            (
+                "run still produced an answer",
+                r["messages"][-1].content[0].get("type") == "text",
+            ),
+        ],
+    )
+
+    # ---- 6. well-formed single call passes through untouched ----
+    agent = build(
+        [
+            ai_valid([("search_books", {"query": "grapple rules"})]),
+            ai_text("Here are the rules."),
+        ]
+    )
+    results["6 valid passthrough"] = run(
+        "CASE 6  normal single call -> repair does not interfere",
+        agent,
+        lambda r: [
+            ("executed exactly once", CALLS == ["grapple rules"]),
+            (
+                "no repair message emitted",
+                not any(
+                    isinstance(m, ToolMessage)
+                    and str(m.content).startswith("[malformed")
+                    for m in r["messages"]
+                ),
+            ),
+        ],
+    )
+
+    # ---- 7. several well-formed calls all run ----
+    agent = build(
+        [
+            ai_valid(
+                [("search_books", {"query": "a"}), ("search_books", {"query": "b"})]
+            ),
+            ai_text("Both answered."),
+        ]
+    )
+    results["7 multi valid"] = run(
+        "CASE 7  two well-formed calls -> both execute, untouched",
+        agent,
+        lambda r: [
+            ("both executed", sorted(CALLS) == ["a", "b"]),
+            (
+                "two ToolMessages",
+                sum(isinstance(m, ToolMessage) for m in r["messages"]) == 2,
+            ),
+        ],
+    )
+
+    # ---- 8. mixed: one call recoverable, one not ----
+    agent = build(
+        [ai_invalid_many([BAD_CONCAT, TRUNCATED]), ai_text("Answered what I could.")]
+    )
+    results["8 partial recovery"] = run(
+        "CASE 8  one recoverable + one unrecoverable call in the same message",
+        agent,
+        lambda r: [
+            (
+                "the recoverable call still ran, expanded into two searches",
+                len(CALLS) == 2,
+            ),
+            (
+                "the unrecoverable call was reported, not silently dropped",
+                any(
+                    isinstance(m, ToolMessage)
+                    and str(m.content).startswith("[tool call dropped]")
+                    for m in r["messages"]
+                ),
+            ),
+            (
+                "the dropped notice names a real tool_call_id",
+                any(
+                    isinstance(m, ToolMessage)
+                    and str(m.content).startswith("[tool call dropped]")
+                    and m.tool_call_id
+                    for m in r["messages"]
+                ),
+            ),
+            (
+                "no invalid_tool_call block survives in history",
+                all(
+                    b.get("type") != "invalid_tool_call"
+                    for m in r["messages"]
+                    if isinstance(m, AIMessage)
+                    for b in m.content
+                    if isinstance(b, dict)
+                ),
+            ),
+            (
+                "run still produced an answer",
+                r["messages"][-1].content[0].get("type") == "text",
+            ),
+        ],
+    )
+
+    # ---- 9. the same malformation on an MCP tool, not search_books ----
+    # the model ran three vault_list calls together into one set of arguments and
+    # the turn died on the spot: no valid tool call to route on, no text block to
+    # show, so the answer just stopped after the reasoning
+    agent = build_with_mcp(
+        [
+            ai_invalid(BAD_MCP_CONCAT, name="vault_list"),
+            ai_text("Three folders listed."),
+        ]
+    )
+    results["9 mcp repair"] = run(
+        "CASE 9  malformed MCP call -> three executed listings, turn survives",
+        agent,
+        lambda r: [
+            (
+                "all three paths listed",
+                # parallel tool calls finish in whatever order they finish
+                sorted(CALLS) == ["Campaign Notes", "Rules", "Session Logs"],
+            ),
+            (
+                "three ToolMessages returned",
+                sum(isinstance(m, ToolMessage) for m in r["messages"]) == 3,
+            ),
+            (
+                "no invalid_tool_call block left in history",
+                all(
+                    b.get("type") != "invalid_tool_call"
+                    for m in r["messages"]
+                    if isinstance(m, AIMessage)
+                    for b in m.content
+                    if isinstance(b, dict)
+                ),
+            ),
+            (
+                "the turn reached an answer instead of ending early",
+                r["messages"][-1].content[0].get("type") == "text",
+            ),
+        ],
+    )
+
+    # ---- 10. the repaired message can still be sent back to ollama ----
+    # ChatOllama only unpacks v1 blocks -- reasoning, tool_call -- on a message
+    # whose response_metadata says output_version is v1. rebuilding the message
+    # from scratch dropped that, so the repair worked and then the next model call
+    # died on "Unsupported message content type"
+    def converts(result) -> bool:
+        """Would ChatOllama accept this history on the next model call?"""
+
+        try:
+            ChatOllama(model="qwen3.8:27b")._convert_messages_to_ollama_messages(
+                result["messages"]
             )
-            == 2,
-        ),
-        ("terminated instead of looping forever", True),
-    ],
-)
+            return True
+        except ValueError as exc:
+            print(f"    converter rejected the history: {exc}")
+            return False
 
-# ---- 4. tool raises -> ToolErrorMiddleware feeds it back ----
-agent = build(
-    [
-        ai_valid([("search_books", {"query": "grapple"})]),
-        ai_text("Told the user the library is unavailable."),
-    ],
-    raises=True,
-)
-results["4 tool error"] = run(
-    "CASE 4  search_books raises -> error fed back, run survives",
-    agent,
-    lambda r: [
-        ("run did not crash", True),
-        (
-            "error surfaced as a ToolMessage",
-            any(
-                isinstance(m, ToolMessage) and m.status == "error"
-                for m in r["messages"]
+    agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
+    results["10 ollama accepts repair"] = run(
+        "CASE 10  the repaired message is still sendable to ollama",
+        agent,
+        lambda r: [
+            (
+                "the repaired message kept the model's own metadata",
+                all(
+                    m.response_metadata.get("output_version") == "v1"
+                    for m in r["messages"]
+                    if isinstance(m, AIMessage)
+                ),
             ),
-        ),
-        (
-            "message names the exception type",
-            any(
-                isinstance(m, ToolMessage) and "RuntimeError" in str(m.content)
-                for m in r["messages"]
-            ),
-        ),
-        (
-            "message forbids answering from general knowledge",
-            any(
-                isinstance(m, ToolMessage) and "general knowledge" in str(m.content)
-                for m in r["messages"]
-            ),
-        ),
-    ],
-)
+            ("the whole history converts for the next model call", converts(r)),
+        ],
+    )
 
-# ---- 5. call limit blocks the 4th search in one turn ----
-agent = build(
-    [
-        ai_valid([("search_books", {"query": f"q{i}"}) for i in range(4)]),
-        ai_text("Answered with what I had."),
-    ],
-    run_limit=3,
-)
-results["5 call limit"] = run(
-    "CASE 5  four searches in one turn with run_limit=3",
-    agent,
-    lambda r: [
-        ("at most 3 searches actually ran", len(CALLS) <= 3),
-        (
-            "run still produced an answer",
-            r["messages"][-1].content[0].get("type") == "text",
-        ),
-    ],
-)
-
-# ---- 6. well-formed single call passes through untouched ----
-agent = build(
-    [
-        ai_valid([("search_books", {"query": "grapple rules"})]),
-        ai_text("Here are the rules."),
-    ]
-)
-results["6 valid passthrough"] = run(
-    "CASE 6  normal single call -> repair does not interfere",
-    agent,
-    lambda r: [
-        ("executed exactly once", CALLS == ["grapple rules"]),
-        (
-            "no repair message emitted",
-            not any(
-                isinstance(m, ToolMessage) and str(m.content).startswith("[malformed")
-                for m in r["messages"]
-            ),
-        ),
-    ],
-)
-
-# ---- 7. several well-formed calls all run ----
-agent = build(
-    [
-        ai_valid([("search_books", {"query": "a"}), ("search_books", {"query": "b"})]),
-        ai_text("Both answered."),
-    ]
-)
-results["7 multi valid"] = run(
-    "CASE 7  two well-formed calls -> both execute, untouched",
-    agent,
-    lambda r: [
-        ("both executed", sorted(CALLS) == ["a", "b"]),
-        (
-            "two ToolMessages",
-            sum(isinstance(m, ToolMessage) for m in r["messages"]) == 2,
-        ),
-    ],
-)
-
-# ---- 8. mixed: one call recoverable, one not ----
-agent = build(
-    [ai_invalid_many([BAD_CONCAT, TRUNCATED]), ai_text("Answered what I could.")]
-)
-results["8 partial recovery"] = run(
-    "CASE 8  one recoverable + one unrecoverable call in the same message",
-    agent,
-    lambda r: [
-        ("the recoverable call still ran, expanded into two searches", len(CALLS) == 2),
-        (
-            "the unrecoverable call was reported, not silently dropped",
-            any(
-                isinstance(m, ToolMessage)
-                and str(m.content).startswith("[tool call dropped]")
-                for m in r["messages"]
-            ),
-        ),
-        (
-            "the dropped notice names a real tool_call_id",
-            any(
-                isinstance(m, ToolMessage)
-                and str(m.content).startswith("[tool call dropped]")
-                and m.tool_call_id
-                for m in r["messages"]
-            ),
-        ),
-        (
-            "no invalid_tool_call block survives in history",
-            all(
-                b.get("type") != "invalid_tool_call"
-                for m in r["messages"]
-                if isinstance(m, AIMessage)
-                for b in m.content
-                if isinstance(b, dict)
-            ),
-        ),
-        (
-            "run still produced an answer",
-            r["messages"][-1].content[0].get("type") == "text",
-        ),
-    ],
-)
-
-# ---- 9. the same malformation on an MCP tool, not search_books ----
-# the model ran three vault_list calls together into one set of arguments and
-# the turn died on the spot: no valid tool call to route on, no text block to
-# show, so the answer just stopped after the reasoning
-agent = build_with_mcp(
-    [ai_invalid(BAD_MCP_CONCAT, name="vault_list"), ai_text("Three folders listed.")]
-)
-results["9 mcp repair"] = run(
-    "CASE 9  malformed MCP call -> three executed listings, turn survives",
-    agent,
-    lambda r: [
-        (
-            "all three paths listed",
-            CALLS == ["Campaign Notes", "Rules", "Session Logs"],
-        ),
-        (
-            "three ToolMessages returned",
-            sum(isinstance(m, ToolMessage) for m in r["messages"]) == 3,
-        ),
-        (
-            "no invalid_tool_call block left in history",
-            all(
-                b.get("type") != "invalid_tool_call"
-                for m in r["messages"]
-                if isinstance(m, AIMessage)
-                for b in m.content
-                if isinstance(b, dict)
-            ),
-        ),
-        (
-            "the turn reached an answer instead of ending early",
-            r["messages"][-1].content[0].get("type") == "text",
-        ),
-    ],
-)
-
-
-# ---- 10. the repaired message can still be sent back to ollama ----
-# ChatOllama only unpacks v1 blocks -- reasoning, tool_call -- on a message
-# whose response_metadata says output_version is v1. rebuilding the message
-# from scratch dropped that, so the repair worked and then the next model call
-# died on "Unsupported message content type"
-def converts(result) -> bool:
-    """Would ChatOllama accept this history on the next model call?"""
-
-    try:
-        ChatOllama(model="qwen3.8:27b")._convert_messages_to_ollama_messages(
-            result["messages"]
-        )
-        return True
-    except ValueError as exc:
-        print(f"    converter rejected the history: {exc}")
-        return False
-
-
-agent = build([ai_invalid(BAD_CONCAT), ai_text("Both parts answered.")])
-results["10 ollama accepts repair"] = run(
-    "CASE 10  the repaired message is still sendable to ollama",
-    agent,
-    lambda r: [
-        (
-            "the repaired message kept the model's own metadata",
-            all(
-                m.response_metadata.get("output_version") == "v1"
-                for m in r["messages"]
-                if isinstance(m, AIMessage)
-            ),
-        ),
-        ("the whole history converts for the next model call", converts(r)),
-    ],
-)
-
-print("\n" + "=" * 70)
-print("SUMMARY")
-print("=" * 70)
-for k, v in results.items():
-    print(f"  {'PASS' if v else 'FAIL'}   {k}")
-print(f"\n{sum(results.values())}/{len(results)} cases passed")
+    print("\n" + "=" * 70)
+    print("SUMMARY")
+    print("=" * 70)
+    for k, v in results.items():
+        print(f"  {'PASS' if v else 'FAIL'}   {k}")
+    print(f"\n{sum(results.values())}/{len(results)} cases passed")
+    failed = [label for label, ok in results.items() if not ok]
+    assert not failed, f"failing cases: {failed}"
