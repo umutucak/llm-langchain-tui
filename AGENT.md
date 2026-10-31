@@ -24,10 +24,10 @@ uv run python scripts/inspect_context.py    # dump a thread's context as HTML
 - All commands go through uv; dev tools (ruff, mdformat) install via
   `uv sync --group dev`.
 
-- `make format` reformats everything; `make lint` runs the exact checks CI runs
-  (`.github/workflows/ci.yml`: ruff format --check, ruff check, mdformat --check --wrap
-  88). `make test` runs the whole suite (pytest over `tests/`). Same strings, so hook,
-  CI, and local can't drift.
+- `make format` reformats everything. `make lint` and `make test` are what CI runs
+  (`.github/workflows/ci.yml` is just `make lint`, then `make test`), so hook, CI, and
+  local can't drift: lint is ruff format --check, ruff check, mdformat --check --wrap
+  88; test is pytest over `tests/`.
 
 - A checked-in pre-commit hook runs `make lint` on every commit and blocks on failure.
   It needs one-time activation per clone: `git config core.hooksPath hooks`.
