@@ -138,22 +138,23 @@ class ToolRow(Collapsible):
     async def resolve(self, output, error, timed: bool = True) -> None:
         """Settle the row once output_deltas has run dry.
 
+        On the live path output is only the tool's content string: the artifact
+        and the middleware's error status ride on the ToolMessage, which the
+        graph commits at the end of the superstep. finish() applies those once
+        it exists; a row settled from a ToolMessage already applies them here.
+
         timed=False is for rows rebuilt from a checkpoint, where the duration
         would be the age of the widget rather than of the search.
         """
 
-        if self._timer is not None:
-            self._timer.stop()
-            self._timer = None
-
+        self._stop_spinner()
         when = f" · {time.monotonic() - self._started:.1f}s" if timed else ""
         self.remove_class("-running")
 
-        # output is a ToolMessage, not the string the tool returned. a failure can
-        # arrive two ways: an exception reaches tc.error only when nothing caught
-        # it, and ToolErrorMiddleware catches search failures first and hands back
-        # a ToolMessage with status="error" instead. the repair middleware's
-        # dropped-call notices arrive the same way
+        # a failure can arrive two ways: an exception reaches tc.error only when
+        # nothing caught it, and ToolErrorMiddleware catches search failures
+        # first and hands back a ToolMessage with status="error" instead. the
+        # repair middleware's dropped-call notices arrive the same way
         text = tool_text(getattr(output, "content", output))
         failed = error is not None or getattr(output, "status", None) == "error"
 
@@ -172,26 +173,56 @@ class ToolRow(Collapsible):
             )
             return
 
-        # a search that matched nothing is not a failure, so it arrives here
-        # looking like any other answer. search_books puts its count in the
-        # artifact, which is the only way to tell the two apart -- a tool that
-        # reports no count gets its size instead of an invented passage figure
+        if isinstance(output, ToolMessage):
+            await self.finish(output, timed=timed)
+            return
+
+        # the stream's string only, so no artifact to classify on yet. show the
+        # text now and let finish() correct the title once the round commits
+        self.add_class("-ok")
+        self.title = self._row_title("✓", f"{compact(len(text))} chars{when}")
+        await self._body.update(
+            citations.normalize(preview(text)) or "(nothing returned)"
+        )
+
+    async def finish(self, output, timed: bool = True) -> None:
+        """Classify a settled row from its committed ToolMessage.
+
+        a search that matched nothing is not a failure, so it arrives here
+        looking like any other answer. search_books puts its count in the
+        artifact, which is the only way to tell the two apart -- a tool that
+        reports no count gets its size instead of an invented passage figure
+        """
+
+        self._stop_spinner()
+        when = f" · {time.monotonic() - self._started:.1f}s" if timed else ""
+        self.remove_class("-running")
+        text = tool_text(getattr(output, "content", output))
         passages = (getattr(output, "artifact", None) or {}).get("passages")
 
         if passages == 0:
             self.add_class("-empty")
+            # resolve() may have already marked the row ok on the char fallback
+            self.remove_class("-ok")
             self.title = self._row_title("∅", f"no passages{when}")
         elif passages is not None:
             self.add_class("-ok")
+            self.remove_class("-empty")
             plural = "" if passages == 1 else "s"
             self.title = self._row_title("✓", f"{passages} passage{plural}{when}")
         else:
             self.add_class("-ok")
+            self.remove_class("-empty")
             self.title = self._row_title("✓", f"{compact(len(text))} chars{when}")
 
         await self._body.update(
             citations.normalize(preview(text)) or "(nothing returned)"
         )
+
+    def _stop_spinner(self) -> None:
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer = None
 
 
 class AssistantTurn(Vertical):
@@ -988,6 +1019,7 @@ class LlmTui(App):
                     self._pump_messages(stream, turn),
                     self._pump_tools(stream, turn),
                 )
+                await self._sync_tool_rows(turn)
                 interrupts = await stream.interrupts()
                 if not interrupts:
                     break
@@ -1161,6 +1193,31 @@ class LlmTui(App):
                 pass
         finally:
             await row.resolve(tc.output, tc.error)
+
+    async def _sync_tool_rows(self, turn: AssistantTurn) -> None:
+        """Finish the round's rows from the committed ToolMessages.
+
+        tc.output is only the tool's content string; the artifact and the
+        middleware's error status live on the ToolMessage, which the graph
+        commits at the end of the superstep. Reading state here, after the
+        pumps drain, is what makes that commit guaranteed -- a lookup when
+        output_deltas runs dry races it (issue #18).
+        """
+
+        state = await self.agent.aget_state(self.agent_thread_config)
+        by_id = {
+            message.tool_call_id: message
+            for message in state.values.get("messages", [])
+            if isinstance(message, ToolMessage) and message.tool_call_id
+        }
+        for row in turn.query(ToolRow):
+            # a row settled from tc.error already shows the raised message,
+            # which the ToolMessage does not carry
+            if row.has_class("-error"):
+                continue
+            message = by_id.get(row.tool_call_id)
+            if message is not None:
+                await row.finish(message)
 
     async def _read_usage(self) -> None:
         """Token counts straight from the model, rather than guessed from text.
