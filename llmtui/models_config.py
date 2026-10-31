@@ -448,11 +448,16 @@ def build_embeddings(entry: EmbeddingsEntry):
     if entry.api != "openai-completions":
         raise RuntimeError(f"no embeddings builder for api {entry.api!r}")
 
+    params = dict(entry.params or {})
+    # Bound dead response bodies by default while preserving provider overrides.
+    params.setdefault("timeout", 120.0)
+    params.setdefault("max_retries", 2)
+
     return OpenAIEmbeddings(
         base_url=entry.base_url,
         api_key=entry.api_key,
         model=entry.model,
-        **(entry.params or {}),
+        **params,
     )
 
 
