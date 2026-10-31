@@ -15,3 +15,5 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mdformat --check --wrap 88 *.md
+      - run: cp config/config.example.json config/config.json
+      - run: uv run --with pytest python -m pytest tests/test_ingest.py
