@@ -3,8 +3,6 @@
     "sqlite_db": "db/checkpoints.sqlite",
     "milvus_db": "db/milvus.db",
     "backup_dir": "db/backups",
-    "system_prompt": "llmtui/prompts/system.txt",
-    "self_name_prompt": "llmtui/prompts/self_name.txt",
     "obsidian_cert": "resources/obsidian-local-rest-api.pem"
   },
   "milvus": {

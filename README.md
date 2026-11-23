@@ -7,26 +7,61 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/). After cloning:
 
 ```sh
 uv sync                    # creates .venv, installs the pinned deps
-cp config/config.example.json config/config.json    # app settings
-cp config/models.example.json config/models.json    # providers + models
 ```
+
+## install as gm
+
+```sh
+uv tool install .          # from the repo; puts `gm` on the PATH
+gm                         # the chat TUI, from any directory
+gm update                  # update to the latest tagged release
+gm --version
+```
+
+Updates after that are always `gm update` (or `uv tool upgrade llmtui`); re-install with
+`uv tool install .` while developing.
 
 ## configuration
 
-Both config files are gitignored — the committed `*.example.json` files are the
-templates. Paths inside them are relative to the project root and resolved in
-`llmtui/config.py`, so scripts run the same from any directory. A bad file fails at
-import, naming the offending key.
+Everything lives under one root: `~/.config/llmtui/` (Linux and macOS) or
+`%APPDATA%\llmtui\` (Windows):
 
-`config/config.json` — app settings: sqlite/milvus db paths, milvus index options, the
-obsidian api key and cert, agent behaviour (`max_tool_calls`, `display_thinking`).
+```text
+~/.config/llmtui/
+├── config.json          # app settings
+├── models.json          # providers + models
+├── db/                  # sqlite checkpoints, milvus store, backups
+└── last_update_check    # written by gm's daily update check
+```
 
-`config/models.json` — providers and models, pi-harness style. Any OpenAI-compatible
-endpoint (ollama, llama.cpp server, vLLM, LM Studio, remote apis) is just a JSON entry;
-no code changes. Sampling params (`temperature`, `top_k`, ...) are per model and sent
-through to the server verbatim. `"$ENV_VAR"` in any string reads from the environment.
-`/model` in the TUI switches between entries; the file is re-read every time the picker
-opens, so edits land without a restart.
+Copy the committed templates there on first run:
+
+```sh
+mkdir -p ~/.config/llmtui
+cp config/config.example.json ~/.config/llmtui/config.json
+cp config/models.example.json ~/.config/llmtui/models.json
+```
+
+(Coming from an older checkout: your `config/config.json` and `config/models.json`
+migrate by hand — copy them across; db files go into `db/`.)
+
+Paths inside config.json may be relative (resolved against the root) or absolute; the
+system prompts are packaged inside the app and need no config entry, but a
+`system_prompt` / `self_name_prompt` path in config.json overrides the packaged one. A
+bad file fails at import, naming the offending key.
+
+config.json — app settings: sqlite/milvus db paths, milvus index options, the obsidian
+api key and cert, agent behaviour (`max_tool_calls`, `display_thinking`), and the
+`workspace` path (asked once on first boot; everything the agent produces —
+`templates/`, `artifacts/`, `Memory/` — lives there, default
+`~/Documents/gm-assistant`).
+
+`config/models.json` in the config dir — providers and models, pi-harness style. Any
+OpenAI-compatible endpoint (ollama, llama.cpp server, vLLM, LM Studio, remote apis) is
+just a JSON entry; no code changes. Sampling params (`temperature`, `top_k`, ...) are
+per model and sent through to the server verbatim. `"$ENV_VAR"` in any string reads from
+the environment. `/model` in the TUI switches between entries; the file is re-read every
+time the picker opens, so edits land without a restart.
 
 ## models and providers
 
@@ -40,7 +75,8 @@ models get `reasoning_effort` from their `reasoning` field.
 ## running it
 
 ```sh
-uv run python app.py                        # the chat TUI
+uv run gm                                  # the chat TUI (dev path; same main())
+uv run python app.py                       # equivalent dev shim
 uv run python scripts/ingest.py <pdf_dir>   # build the vector store
 uv run python scripts/inspect_context.py    # dump a thread's context as html
 ```
