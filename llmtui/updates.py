@@ -30,17 +30,20 @@ def installed_version() -> str:
         return "0.0.0.dev0"
 
 
-def latest_tag() -> str | None:
-    """The repo's newest tag, newest first per the GitHub API. None on failure."""
+def latest_tag() -> tuple[str, str | None]:
+    """(status, tag). status is "ok" | "empty" | "error"; the tag is the
+    repo's newest one (GitHub returns them newest-first), None when there
+    isn't one or the API call failed.
+    """
 
     try:
         with urllib.request.urlopen(
             f"https://api.github.com/repos/{REPO}/tags", timeout=3
         ) as r:
             tags = json.load(r)
-        return tags[0]["name"] if tags else None
+        return "ok", tags[0]["name"] if tags else None
     except Exception:
-        return None
+        return "error", None
 
 
 def _key(v: str) -> tuple[int, ...]:
@@ -66,7 +69,7 @@ def check_for_update() -> str | None:
     except OSError:
         pass
 
-    tag = latest_tag()
+    _, tag = latest_tag()
     try:
         _CHECK_FILE.write_text(str(now))
     except OSError:
@@ -79,9 +82,13 @@ def check_for_update() -> str | None:
 def update() -> int:
     """`gm update`: reinstall from the latest tag. Returns an exit code."""
 
-    tag = latest_tag()
+    status, tag = latest_tag()
     if tag is None:
-        print("gm update: could not reach GitHub to find the latest version")
+        print(
+            "gm update: no tagged release found on GitHub"
+            if status == "empty"
+            else "gm update: could not reach GitHub to find the latest version"
+        )
         return 1
     print(f"updating gm to {tag} ...")
     try:

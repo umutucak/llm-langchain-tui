@@ -149,7 +149,7 @@ def test_update_check_once_a_day(cfg, tmp_path, monkeypatch):
     import llmtui.updates as u
 
     monkeypatch.setattr(u, "_CHECK_FILE", tmp_path / "stamp")
-    monkeypatch.setattr(u, "latest_tag", lambda: "v9.9.9")
+    monkeypatch.setattr(u, "latest_tag", lambda: ("ok", "v9.9.9"))
     assert u.check_for_update() == u.UPDATE_HINT
     assert (tmp_path / "stamp").exists()
 
@@ -158,6 +158,7 @@ def test_update_check_once_a_day(cfg, tmp_path, monkeypatch):
 
     def no_fetch():
         calls.append(1)
+        return "error", None
 
     monkeypatch.setattr(u, "latest_tag", no_fetch)
     assert u.check_for_update() is None
@@ -168,7 +169,7 @@ def test_update_check_silent_on_failure(cfg, tmp_path, monkeypatch):
     import llmtui.updates as u
 
     monkeypatch.setattr(u, "_CHECK_FILE", tmp_path / "stamp")
-    monkeypatch.setattr(u, "latest_tag", lambda: None)
+    monkeypatch.setattr(u, "latest_tag", lambda: ("error", None))
     assert u.check_for_update() is None
 
 
@@ -183,7 +184,7 @@ def test_is_newer():
 def test_gm_update_shells_out_to_uv(cfg, monkeypatch):
     import llmtui.updates as u
 
-    monkeypatch.setattr(u, "latest_tag", lambda: "v0.2.0")
+    monkeypatch.setattr(u, "latest_tag", lambda: ("ok", "v0.2.0"))
     ran = {}
 
     def fake_run(cmd, **kwargs):
