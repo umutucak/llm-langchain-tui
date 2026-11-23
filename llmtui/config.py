@@ -132,6 +132,18 @@ WORKSPACE_DIR: str | None = (
     str(Path(_cfg["workspace"]).expanduser()) if "workspace" in _cfg else None
 )
 
+
+def save_workspace(path: str) -> None:
+    """Persist the workspace choice to config.json and the live module state."""
+
+    global WORKSPACE_DIR
+    WORKSPACE_DIR = path
+    _cfg["workspace"] = path
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(_cfg, f, indent=2)
+
+
 # milvus index configuration, shared by ingest and search so the schemas match
 _milvus = _section("milvus")
 DENSE_METRIC_TYPE: str = _get(_milvus, "dense_metric_type")

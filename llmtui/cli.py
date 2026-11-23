@@ -21,6 +21,12 @@ warnings.filterwarnings(
 
 
 async def main_async() -> None:
+    # first-boot workspace: prompts once, before anything else is built
+    from llmtui.workspace import ensure_workspace
+
+    if await ensure_workspace() is None:
+        return
+
     sqlite_connection = connect()
 
     # first entry of models.json is the default: file order is preference

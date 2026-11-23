@@ -90,7 +90,9 @@ optional override path in the config dir that wins over the packaged default.
 - One root directory holds everything, config and data alike: `~/.config/llmtui/` on
 Linux **and** macOS, `%APPDATA%\llmtui\` on Windows. No separate data dir — on macOS
 `user_config_dir` and `user_data_dir` are the same path anyway, and a single root is
-one place to explain, back up and delete. The layout inside the root:
+one place to explain, back up and delete. The root is hand-rolled (three lines) rather
+than platformdirs, because platformdirs picks the macOS Library dir and we want the
+XDG path on both Unix platforms. The layout inside the root:
 
 ```text
 ~/.config/llmtui/
