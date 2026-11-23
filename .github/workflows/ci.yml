@@ -13,5 +13,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
       - run: make lint
-      - run: cp config/config.example.json config/config.json
+      - name: seed the config dir
+        run: |
+          mkdir -p ~/.config/llmtui
+          cp config/config.example.json ~/.config/llmtui/config.json
+          cp config/models.example.json ~/.config/llmtui/models.json
       - run: make test
