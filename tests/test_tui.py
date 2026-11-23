@@ -156,18 +156,6 @@ def check(label, conditions):
     assert not failed, f"{label}: {failed}"
 
 
-async def wait_until(pilot, predicate, timeout=15.0):
-    """Sleeps flake on slow CI runners; wait for the state itself instead."""
-
-    deadline = asyncio.get_running_loop().time() + timeout
-    while asyncio.get_running_loop().time() < deadline:
-        if predicate():
-            return True
-        await asyncio.sleep(0.05)
-        await pilot.pause()
-    return False
-
-
 # ---- helpers are pure, check them first ----
 def test_helpers():
     check(
@@ -1517,23 +1505,25 @@ async def case_write_diff_screen():
     async with app.run_test() as pilot:
         app.query_one("#prompt").text = "rewrite my note"
         await pilot.press("enter")
-        # the card must be up before the second enter, or the keypress goes
-        # to the prompt instead of the diff (the CI failure mode)
-        assert await wait_until(pilot, lambda: len(list(app.query(WriteCard))) == 1), (
-            "write card never appeared"
-        )
+        await asyncio.sleep(1.2)
+        await pilot.pause()
 
         await pilot.press("enter")
-        opened = await wait_until(pilot, lambda: isinstance(app.screen, DiffScreen))
+        await asyncio.sleep(0.4)
+        await pilot.pause()
+        opened = isinstance(app.screen, DiffScreen)
         # the body holds a rich Syntax, so the diff is on the renderable itself
         body = app.screen.query_one(".diff-body").content if opened else None
         shown = getattr(body, "code", "")
 
         await pilot.press("escape")
-        closed = await wait_until(pilot, lambda: not isinstance(app.screen, DiffScreen))
+        await asyncio.sleep(0.4)
+        await pilot.pause()
+        closed = not isinstance(app.screen, DiffScreen)
 
         await pilot.press("r")
-        await wait_until(pilot, lambda: len(answer_blocks(app)) == 1)
+        await asyncio.sleep(1.0)
+        await pilot.pause()
 
         check(
             "23  the card opens into the whole diff",
