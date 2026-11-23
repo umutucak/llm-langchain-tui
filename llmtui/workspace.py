@@ -16,6 +16,10 @@ from textual.widgets import Input, Static
 
 DEFAULT_WORKSPACE = "~/Documents/gm-assistant"
 
+# top-level folders created inside a fresh workspace; #37's file tools write
+# into these (children are created lazily by the agent)
+WORKSPACE_DIRS = ("templates", "artifacts", "memory")
+
 
 def migrate_workspace(old: str, new: str) -> None:
     """Move a workspace's contents to a new directory, without data loss.
@@ -115,7 +119,7 @@ class WorkspacePrompt(App[str | None]):
         path = Path(raw).expanduser().resolve()
         self.existing = path.is_dir()
         # skeleton: the two top folders #37 writes into, plus memory
-        for child in ("templates", "artifacts", "memory"):
+        for child in WORKSPACE_DIRS:
             (path / child).mkdir(parents=True, exist_ok=True)
         self.exit(str(path))
 

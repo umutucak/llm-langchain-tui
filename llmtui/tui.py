@@ -835,7 +835,7 @@ class SettingsScreen(ModalScreen[None]):
         )
 
     def _set_workspace(self, raw: str) -> None:
-        from llmtui.workspace import migrate_workspace
+        from llmtui.workspace import WORKSPACE_DIRS, migrate_workspace
 
         ws = Path(raw).expanduser().resolve()
         current = config.WORKSPACE_DIR
@@ -843,7 +843,7 @@ class SettingsScreen(ModalScreen[None]):
             # full migration: copy, verify byte-for-byte, then remove the old
             migrate_workspace(current, str(ws))
         else:
-            for child in ("templates", "artifacts", "memory"):
+            for child in WORKSPACE_DIRS:
                 (ws / child).mkdir(parents=True, exist_ok=True)
         config.save_workspace(str(ws))
 
