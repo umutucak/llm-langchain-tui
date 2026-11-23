@@ -75,7 +75,10 @@ def main() -> None:
         "--version", action="store_true", help="print the installed version and exit"
     )
     parser.add_argument(
-        "update", nargs="?", help="update gm to the latest tagged release"
+        "update",
+        nargs="?",
+        choices=["update"],
+        help="update gm to the latest tagged release",
     )
     parser.add_argument(
         "-n",
