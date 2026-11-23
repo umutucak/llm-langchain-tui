@@ -10,7 +10,7 @@ import re
 import subprocess
 import time
 import urllib.request
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import PackageNotFoundError, distribution, version
 from pathlib import Path
 
 from llmtui import config
@@ -24,10 +24,30 @@ _CHECK_INTERVAL = 24 * 60 * 60
 
 
 def installed_version() -> str:
+    """The plain base version, for comparisons (is_newer)."""
+
     try:
         return version("llmtui")
     except PackageNotFoundError:
         return "0.0.0.dev0"
+
+
+def version_display() -> str:
+    """The version plus what uv installed, when known: a nightly from main
+    and a tag install both say 0.1.0 in metadata, so the ref+commit is the
+    only way --version can tell them apart."""
+
+    base = installed_version()
+    try:
+        info = json.loads(distribution("llmtui").read_text("direct_url.json") or "{}")
+        vcs = info.get("vcs_info", {})
+        ref = vcs.get("requested_revision")
+        commit = (vcs.get("commit_id") or "")[:7]
+        if ref:
+            return f"{base} ({ref}@{commit})" if commit else f"{base} ({ref})"
+    except (PackageNotFoundError, OSError, ValueError):
+        pass
+    return base
 
 
 def latest_tag() -> tuple[str, str | None]:

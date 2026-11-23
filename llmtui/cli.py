@@ -97,9 +97,9 @@ def main() -> None:
 
     args = parser.parse_args()
     if args.version:
-        from llmtui.updates import installed_version
+        from llmtui.updates import version_display
 
-        print(f"gm {installed_version()}")
+        print(f"gm {version_display()}")
         return
     if args.command == "update":
         from llmtui.updates import update
