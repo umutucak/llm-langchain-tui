@@ -18,9 +18,10 @@ question about where artifacts go, use the app.
 
 ## Non-goals
 
-- No subcommands. `gm` is the whole interface; `/model`, `/load`, `/new` and friends
-  stay slash commands inside the TUI. (A `gm --help` comes free from argparse-like
-  handling only if it costs nothing.)
+- No **chat** subcommands. `/model`, `/load`, `/new` and friends stay slash commands
+  inside the TUI; `gm` with no args (or only TUI flags) opens the chat. Shell-level
+  utility subcommands are allowed: `gm update`, `gm --version`. No further utilities
+  without a reason — nothing that would pull chat responsibility out of the TUI.
 - No per-campaign folders or campaign registry. The workspace is flat: `templates/`,
   `artifacts/`, and whatever the agent creates under them. Campaign separation, if
   wanted later, is thread metadata, not paths.
@@ -50,6 +51,11 @@ replaced by config-dir content (see below).
 deleted outright in favour of `uv run gm`. Either is acceptable; the shim is the smaller
 diff. `main()` moves to `llmtui/cli.py`, unchanged in body.
 
+The user never interacts with `uv`. The one-time `curl … | sh` installer ensures `uv`
+exists (installing it non-interactively if not) and then installs from the latest tag;
+every later update is `gm update`, which shells out to `uv` behind the scenes. The
+curl installer is a small follow-up after this issue.
+
 ### Install and update
 
 ```sh
@@ -73,15 +79,31 @@ optional override path in the config dir that wins over the packaged default.
 
 `llmtui/config.py` switches from `PROJECT_ROOT`-relative resolution to `platformdirs`:
 
-| constant | today | after | |---|---|---| | config.json, models.json |
-`PROJECT_ROOT/config/` | `platformdirs.user_config_dir("llmtui")` | | sqlite, milvus,
-backups | `PROJECT_ROOT/db/` | `platformdirs.user_data_dir("llmtui")` | | system prompt
-| `PROJECT_ROOT/prompts/` | packaged default, overridable from config dir | | pdf
-library | config key, repo-relative | config key, absolute or `~`-relative | |
-artifacts, templates | — (new in #37) | workspace (below) |
+| constant | today | after |
+|---|---|---|
+| config.json, models.json | `PROJECT_ROOT/config/` | root dir |
+| sqlite, milvus, backups | `PROJECT_ROOT/db/` | root dir, `db/` subdir |
+| system prompt | `PROJECT_ROOT/prompts/` | packaged default, overridable from config dir |
+| pdf library | config key, repo-relative | config key, absolute or `~`-relative |
+| artifacts, templates, Memory | — (new in #37) | workspace (below) |
 
-- `platformdirs.user_config_dir("llmtui")` → `~/.config/llmtui` (Linux),
-  `~/Library/Application Support/llmtui` (macOS), `%APPDATA%\llmtui` (Windows).
+- One root directory holds everything, config and data alike: `~/.config/llmtui/` on
+Linux **and** macOS, `%APPDATA%\llmtui\` on Windows. No separate data dir — on macOS
+`user_config_dir` and `user_data_dir` are the same path anyway, and a single root is
+one place to explain, back up and delete. The layout inside the root:
+
+```text
+~/.config/llmtui/
+├── config.json
+├── models.json
+└── db/            # sqlite + milvus + backups
+```
+
+`platformdirs` supplies the root (its `user_config_dir` matches the paths above on all
+three platforms).
+
+The workspace (below) holds everything the agent produces and is the only user-visible
+content directory.
 - Existing keys, validation behaviour (fail at import, offending key named) and the
   `LLMTUI_CONFIG` env override are unchanged — only the base directory moves.
 - `models.json` sits next to `config.json` in the config dir; the README's setup step
@@ -91,6 +113,19 @@ artifacts, templates | — (new in #37) | workspace (below) |
   in the README; nothing auto-migrates. There is exactly one machine to migrate and the
   user is its operator.
 
+### Updates
+
+Release channel is **git tags**. `gm update` shells out to `uv tool install --reinstall
+
+git+https://github.com/umutucak/llm-langchain-tui.git@<latest-tag>`; `gm --version`
+prints `importlib.metadata.version("llmtui")`.
+
+At startup (TUI path only, not the utility subcommands) a background thread hits the
+GitHub API for the latest tag and compares it against the installed version — at most
+once a day, with the last-check timestamp cached in the config dir. On timeout or any
+failure it stays silent. A newer version prints a one-line hint above the chat:
+`new version available — run gm update`.
+
 ## First boot: the workspace
 
 On startup, before the TUI renders, `main()` checks config for `workspace` (an absolute
@@ -99,9 +134,10 @@ path).
 - Missing or no-longer-exists → prompt, inside the TUI, before the chat screen: propose
   `~/Documents/gm-assistant`, accept a custom path, Enter confirms, Esc quits. The
   choice is written to config.json and never asked again.
-- The prompt creates the skeleton on confirm: the workspace directory plus `templates/`
-  and `artifacts/` (children of those two are created lazily by the agent per #37's
-  conventions).
+- The prompt creates the skeleton on confirm: the workspace directory plus `templates/`,
+  `artifacts/` and `Memory/` (children of those are created lazily by the agent per
+  #37's conventions). `Memory/` is #37's memory feature: agent-written notes in the
+  workspace, folded into that issue rather than shipped separately here.
 - If the workspace directory exists but is empty, that is not an error and not a
   re-prompt — an empty workspace is a valid workspace.
 
@@ -110,7 +146,7 @@ The workspace path is exported as `llmtui.config.WORKSPACE_DIR` and is the singl
 
 ## Threads and checkpoints
 
-One sqlite file in the data dir, one milvus db beside it — not per-directory. Threads
+One sqlite file in the root's `db/` dir, one milvus db beside it — not per-directory. Threads
 are already uuid-keyed (`agent_thread_config`); `/load` lists them as it does today.
 Per-campaign separation is deliberately deferred: if it is wanted, it becomes a label on
 threads, not a directory layout.
