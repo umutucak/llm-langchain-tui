@@ -33,7 +33,9 @@ class WorkspacePrompt(App[str | None]):
     def compose(self) -> ComposeResult:
         yield Vertical(
             Static("where should the workspace live?", classes="modal-title"),
-            Input(placeholder=DEFAULT_WORKSPACE, id="workspace"),
+            # the default is real text, not a placeholder: enter accepts it as
+            # is, and the reader can edit it like any path
+            Input(value=DEFAULT_WORKSPACE, id="workspace"),
             Static("enter confirm · esc quit", classes="modal-hint"),
             id="box",
         )
@@ -43,7 +45,9 @@ class WorkspacePrompt(App[str | None]):
 
     @on(Input.Submitted, "#workspace")
     def confirm(self, event: Input.Submitted) -> None:
-        raw = event.value.strip() or DEFAULT_WORKSPACE
+        raw = event.value.strip()
+        if not raw:
+            return
         path = Path(raw).expanduser().resolve()
         self.existing = path.is_dir()
         # skeleton: the two top folders #37 writes into, plus Memory
