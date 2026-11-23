@@ -74,12 +74,19 @@ def main() -> None:
     parser.add_argument(
         "--version", action="store_true", help="print the installed version and exit"
     )
+    parser.add_argument(
+        "update", nargs="?", help="update gm to the latest tagged release"
+    )
     args = parser.parse_args()
     if args.version:
-        from importlib.metadata import version
+        from llmtui.updates import installed_version
 
-        print(f"gm {version('llmtui')}")
+        print(f"gm {installed_version()}")
         return
+    if args.update:
+        from llmtui.updates import update
+
+        raise SystemExit(update())
     asyncio.run(main_async())
 
 

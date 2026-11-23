@@ -922,10 +922,21 @@ class LlmTui(App):
         self.status.context_window = await self.context_window()
         self.status.refresh_line()
         self.query_one("#prompt", PromptArea).focus()
+        # daily update check (issue #38): off-thread, silent on any failure
+        self.run_worker(self._update_check, exclusive=True)
         # anchoring is Textual's own: the container follows new content and lets
         # go the moment the reader scrolls, by whatever means. re-anchored below
         # whenever something new is deliberately put on screen
         self.transcript.anchor()
+
+    async def _update_check(self) -> None:
+        """Daily version check, run off-thread so it can never block the TUI."""
+
+        from llmtui.updates import check_for_update
+
+        hint = await asyncio.get_running_loop().run_in_executor(None, check_for_update)
+        if hint:
+            await self.note(hint)
 
     @on(PromptArea.Changed, "#prompt")
     def prompt_changed(self) -> None:
