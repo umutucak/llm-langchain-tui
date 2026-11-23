@@ -1,26 +1,34 @@
-"""Entry point for the packaged `gm` binary (`gm` bare opens the TUI)."""
+"""Entry point for the packaged `gm` binary (`gm` bare opens the TUI).
+
+Only stdlib and llmtui.updates are imported at module level: the heavy
+application stack (langchain, milvus, textual — over 1.5s of import time)
+is loaded inside main_async, so the utility subcommands run instantly and
+ctrl+c during startup can never land mid-pandas-import (issue #40).
+"""
 
 import argparse
 import asyncio
-import warnings
-
-from langchain_core.utils.uuid import uuid7
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-
-from llmtui.agent import build_agent, build_model
-from llmtui.config import LIBRARY_DIR, SQLITE_DB_PATH
-from llmtui.models_config import flatten, load_models
-from llmtui.sessions import connect
-from llmtui.tools.mcp import MCPStatus, get_mcp_tools, vault_reader
-from llmtui.tui import LlmTui
-
-# announces that its beta, so we shush it
-warnings.filterwarnings(
-    "ignore", message=".*v3 streaming protocol on Pregel is experimental.*"
-)
 
 
 async def main_async() -> None:
+    # the whole stack, imported only when the TUI actually starts
+    import warnings
+
+    from langchain_core.utils.uuid import uuid7
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    from llmtui.agent import build_agent, build_model
+    from llmtui.config import LIBRARY_DIR, SQLITE_DB_PATH
+    from llmtui.models_config import flatten, load_models
+    from llmtui.sessions import connect
+    from llmtui.tools.mcp import MCPStatus, get_mcp_tools, vault_reader
+    from llmtui.tui import LlmTui
+
+    # announces that its beta, so we shush it
+    warnings.filterwarnings(
+        "ignore", message=".*v3 streaming protocol on Pregel is experimental.*"
+    )
+
     # first-boot workspace: prompts once, before anything else is built
     from llmtui.workspace import ensure_workspace
 
