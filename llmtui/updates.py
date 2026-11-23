@@ -33,21 +33,22 @@ def installed_version() -> str:
 
 
 def version_display() -> str:
-    """The version plus what uv installed, when known: a nightly from main
-    and a tag install both say 0.1.0 in metadata, so the ref+commit is the
-    only way --version can tell them apart."""
+    """What uv installed, and nothing else: a nightly shows the commit it was
+    built from, a tag install shows the tag. The pyproject version would just
+    duplicate the tag and is dropped."""
 
-    base = installed_version()
     try:
         info = json.loads(distribution("llmtui").read_text("direct_url.json") or "{}")
         vcs = info.get("vcs_info", {})
         ref = vcs.get("requested_revision")
         commit = (vcs.get("commit_id") or "")[:7]
+        if ref == "main" and commit:
+            return commit
         if ref:
-            return f"{base} ({ref}@{commit})" if commit else f"{base} ({ref})"
+            return ref
     except (PackageNotFoundError, OSError, ValueError):
         pass
-    return base
+    return installed_version()
 
 
 def latest_tag() -> tuple[str, str | None]:
