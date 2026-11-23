@@ -24,12 +24,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
+from platformdirs import user_config_dir
 
 # overridable so tests can point at their own file
 MODELS_PATH: Path = Path(
-    os.getenv("LLMTUI_MODELS", PROJECT_ROOT / "config" / "models.json")
+    os.getenv("LLMTUI_MODELS", Path(user_config_dir("llmtui")) / "models.json")
 )
 
 # the one dialect implemented; see build_chat_model
@@ -130,7 +129,8 @@ def _load_json(path: Path) -> dict:
     if not path.exists():
         raise RuntimeError(
             f"{path} not found. Copy config/models.example.json to"
-            " config/models.json and point it at a server."
+            " copy config/models.example.json into the"
+            " config dir and point it at a server."
         )
     try:
         with open(path) as f:

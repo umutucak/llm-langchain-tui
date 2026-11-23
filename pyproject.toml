@@ -16,6 +16,7 @@ dependencies = [
     "pymupdf==1.28.2",
     "tqdm==4.70.0",
     "textual==8.2.8",
+    "platformdirs==4.13.3",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai==1.7.2",
 ]

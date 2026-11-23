@@ -4,20 +4,30 @@ A missing key, a mistyped value, or a whole missing section raises at import
 with the offending key in the message — the same fail-fast contract the old
 .env reader had, nothing travels far before it breaks.
 
-Relative paths in config.json are resolved against the project root, so app.py
-and anything in scripts/ find db/ and prompts/ regardless of the directory
-they were launched from.
+Everything lives under one root directory: the platform config dir
+(~/.config/llmtui on Linux and macOS, %APPDATA%\\llmtui on Windows),
+config.json and models.json directly inside it, the databases under db/.
+Relative paths in config.json resolve against that root, so `gm` works from
+any directory and an installed binary finds its state the same way the dev
+loop does.
 
-config.json is gitignored (it can hold secrets, e.g. the Obsidian API key);
-config.example.json is the committed template. Copy it to config.json to run.
+config.json and models.json are gitignored (they can hold secrets); the
+*.example.json files in the repo are the committed templates. Copy them into
+the config dir to run.
+
+The system prompts are packaged inside llmtui/prompts and used by default; a
+system_prompt / self_name_prompt key in config.json points at an optional
+override file that wins over the packaged one.
 
 Everything provider/model related lives in models.json (see
 llmtui/models_config.py, step 2 of SPEC-provider-migration.md) — nothing
 here knows about providers.
 """
 
+import importlib.resources
 import json
 import os
+import sys
 from pathlib import Path
 
 # milvus-lite forks a server subprocess out of this process, and gRPC writes a
@@ -26,19 +36,28 @@ from pathlib import Path
 # core reads this at import time, so it is set here, before anything imports it
 os.environ.setdefault("GRPC_VERBOSITY", "NONE")
 
+# dev-only anchor for scripts/inspect_context.py's output; everything the app
+# itself uses resolves against ROOT below
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 
+# one root for config and data alike (issue #38): ~/.config/llmtui on Linux and
+# macOS, %APPDATA%\llmtui on Windows. hand-rolled because platformdirs picks the
+# macOS Library dir, which we deliberately do not want here
+ROOT: Path = (
+    Path.home() / ".config" / "llmtui"
+    if sys.platform != "win32"
+    else Path(os.getenv("APPDATA", "~\\AppData\\Roaming")) / "llmtui"
+).expanduser()
+
 # overridable so tests can point at their own config
-CONFIG_PATH: Path = Path(
-    os.getenv("LLMTUI_CONFIG", PROJECT_ROOT / "config" / "config.json")
-)
+CONFIG_PATH: Path = Path(os.getenv("LLMTUI_CONFIG", ROOT / "config.json"))
 
 
 def _load() -> dict:
     if not CONFIG_PATH.exists():
         raise RuntimeError(
             f"{CONFIG_PATH} not found. Copy config/config.example.json to"
-            " config/config.json and fill in your values."
+            " the config dir and fill in your values."
         )
     try:
         with open(CONFIG_PATH) as f:
@@ -65,9 +84,19 @@ def _get(section: dict, key: str) -> str:
 
 
 def _path(section: dict, key: str) -> str:
-    """Absolute path as a string, resolved against the project root."""
+    """Absolute path as a string; relative values resolve against ROOT."""
 
-    return str(PROJECT_ROOT / _get(section, key))
+    raw = Path(_get(section, key)).expanduser()
+    return str(raw if raw.is_absolute() else ROOT / raw)
+
+
+def _optional_path(section: dict, key: str) -> str | None:
+    """Optional override path; None falls back to the packaged default."""
+
+    value = section.get(key)
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    return _path(section, key)
 
 
 def _int(section: dict, key: str) -> int:
@@ -80,15 +109,28 @@ def _int(section: dict, key: str) -> int:
         ) from None
 
 
+# packaged prompts, always present; config keys below are optional overrides
+_PACKAGED_PROMPTS = importlib.resources.files("llmtui") / "prompts"
+
 # paths
 _paths = _section("paths")
 SQLITE_DB_PATH: str = _path(_paths, "sqlite_db")
 # single live vector store + backup dir (issue #24, replaces the dev/prod split)
 MILVUS_DB_PATH: str = _path(_paths, "milvus_db")
 MILVUS_BACKUP_DIR: str = _path(_paths, "backup_dir")
-SYSTEM_PROMPT_PATH: str = _path(_paths, "system_prompt")
-SELF_NAME_PROMPT_PATH: str = _path(_paths, "self_name_prompt")
+SYSTEM_PROMPT_PATH: str = _optional_path(_paths, "system_prompt") or str(
+    _PACKAGED_PROMPTS / "system.txt"
+)
+SELF_NAME_PROMPT_PATH: str = _optional_path(_paths, "self_name_prompt") or str(
+    _PACKAGED_PROMPTS / "self_name.txt"
+)
 OBSIDIAN_CERT_PATH: str = _path(_paths, "obsidian_cert")
+
+# where the agent's artifacts live. optional: unset means the first-boot
+# workspace prompt in the TUI asks once and writes it back (issue #38)
+WORKSPACE_DIR: str | None = (
+    str(Path(_cfg["workspace"]).expanduser()) if "workspace" in _cfg else None
+)
 
 # milvus index configuration, shared by ingest and search so the schemas match
 _milvus = _section("milvus")
