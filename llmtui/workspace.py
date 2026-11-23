@@ -2,7 +2,7 @@
 
 Runs as its own tiny Textual app so the main TUI stays unaware of setup. The
 choice is persisted via llmtui.config.save_workspace and the skeleton
-(templates/, artifacts/, Memory/) is created on confirm.
+(templates/, artifacts/, memory/) is created on confirm.
 """
 
 import filecmp
@@ -114,8 +114,8 @@ class WorkspacePrompt(App[str | None]):
             return
         path = Path(raw).expanduser().resolve()
         self.existing = path.is_dir()
-        # skeleton: the two top folders #37 writes into, plus Memory
-        for child in ("templates", "artifacts", "Memory"):
+        # skeleton: the two top folders #37 writes into, plus memory
+        for child in ("templates", "artifacts", "memory"):
             (path / child).mkdir(parents=True, exist_ok=True)
         self.exit(str(path))
 

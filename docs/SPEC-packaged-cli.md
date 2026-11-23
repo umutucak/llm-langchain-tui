@@ -83,7 +83,7 @@ optional override path in the config dir that wins over the packaged default.
 `PROJECT_ROOT/config/` | root dir | | sqlite, milvus, backups | `PROJECT_ROOT/db/` |
 root dir, `db/` subdir | | system prompt | `PROJECT_ROOT/prompts/` | packaged default,
 overridable from config dir | | pdf library | config key, repo-relative | config key,
-absolute or `~`-relative | | artifacts, templates, Memory | — (new in #37) | workspace
+absolute or `~`-relative | | artifacts, templates, memory | — (new in #37) | workspace
 (below) |
 
 - One root directory holds everything, config and data alike: `~/.config/llmtui/` on
@@ -157,8 +157,8 @@ path).
   `~/Documents/gm-assistant`, accept a custom path, Enter confirms, Esc quits. The
   choice is written to config.json and never asked again.
 - The prompt creates the skeleton on confirm: the workspace directory plus `templates/`,
-  `artifacts/` and `Memory/` (children of those are created lazily by the agent per
-  #37's conventions). `Memory/` is #37's memory feature: agent-written notes in the
+  `artifacts/` and `memory/` (children of those are created lazily by the agent per
+  #37's conventions). `memory/` is #37's memory feature: agent-written notes in the
   workspace, folded into that issue rather than shipped separately here.
 - If the workspace directory exists but is empty, that is not an error and not a
   re-prompt — an empty workspace is a valid workspace.

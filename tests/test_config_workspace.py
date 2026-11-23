@@ -89,7 +89,7 @@ def _prompt_returns(monkeypatch, module, path, record=None):
             if record is not None:
                 record["ran"] = True
             # the real prompt creates the skeleton on confirm; mirror that
-            for child in ("templates", "artifacts", "Memory"):
+            for child in ("templates", "artifacts", "memory"):
                 (path / child).mkdir(parents=True, exist_ok=True)
             return str(path)
 
@@ -106,7 +106,7 @@ def test_ensure_workspace_persists_and_creates_skeleton(cfg, config_env, monkeyp
     # first boot: prompt fires, skeleton is created, choice persisted
     assert asyncio.run(w.ensure_workspace()) == str(ws)
     assert seen
-    assert sorted(os.listdir(ws)) == ["Memory", "artifacts", "templates"]
+    assert sorted(os.listdir(ws)) == ["artifacts", "memory", "templates"]
     assert json.loads(Path(cfg.CONFIG_PATH).read_text())["workspace"] == str(ws)
 
     # second boot: configured and present -> no prompt
@@ -147,10 +147,10 @@ def test_ensure_workspace_empty_dir_is_valid(cfg, config_env, monkeypatch):
 
 def _make_ws(root: Path) -> Path:
     ws = root / "ws"
-    for child in ("templates", "artifacts", "Memory/deep"):
+    for child in ("templates", "artifacts", "memory/deep"):
         (ws / child).mkdir(parents=True)
-    (ws / "Memory/notes.md").write_text("hello dmg")
-    (ws / "Memory/deep/nested.bin").write_bytes(os.urandom(4096))
+    (ws / "memory/notes.md").write_text("hello dmg")
+    (ws / "memory/deep/nested.bin").write_bytes(os.urandom(4096))
     return ws
 
 
@@ -158,14 +158,14 @@ def test_migrate_happy_path_then_old_removed(cfg, tmp_path):
     import llmtui.workspace as w
 
     src = _make_ws(tmp_path)
-    payload = (src / "Memory/deep/nested.bin").read_bytes()
+    payload = (src / "memory/deep/nested.bin").read_bytes()
     dst = tmp_path / "elsewhere"
 
     w.migrate_workspace(str(src), str(dst))
 
     assert not src.exists()
-    assert (dst / "Memory/notes.md").read_text() == "hello dmg"
-    assert (dst / "Memory/deep/nested.bin").read_bytes() == payload
+    assert (dst / "memory/notes.md").read_text() == "hello dmg"
+    assert (dst / "memory/deep/nested.bin").read_bytes() == payload
 
 
 def test_migrate_refuses_nonempty_target_and_nesting(cfg, tmp_path):
@@ -197,7 +197,7 @@ def test_migrate_rolls_back_on_verification_failure(cfg, tmp_path, monkeypatch):
     # pre-migration state restored: target gone, source untouched
     assert not dst.exists()
     assert src.exists()
-    assert (src / "Memory/notes.md").read_text() == "hello dmg"
+    assert (src / "memory/notes.md").read_text() == "hello dmg"
 
 
 def test_migrate_into_empty_existing_target(cfg, tmp_path):
@@ -209,7 +209,7 @@ def test_migrate_into_empty_existing_target(cfg, tmp_path):
     w.migrate_workspace(str(src), str(dst))
     assert not src.exists()
     assert dst.exists()
-    assert (dst / "Memory/notes.md").read_text() == "hello dmg"
+    assert (dst / "memory/notes.md").read_text() == "hello dmg"
 
 
 # ---------- updates ----------

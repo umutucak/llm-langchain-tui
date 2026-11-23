@@ -53,7 +53,7 @@ bad file fails at import, naming the offending key.
 config.json — app settings: sqlite/milvus db paths, milvus index options, the obsidian
 api key and cert, agent behaviour (`max_tool_calls`, `display_thinking`), and the
 `workspace` path (asked once on first boot; everything the agent produces —
-`templates/`, `artifacts/`, `Memory/` — lives there, default
+`templates/`, `artifacts/`, `memory/` — lives there, default
 `~/Documents/gm-assistant`).
 
 `config/models.json` in the config dir — providers and models, pi-harness style. Any

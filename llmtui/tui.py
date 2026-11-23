@@ -843,7 +843,7 @@ class SettingsScreen(ModalScreen[None]):
             # full migration: copy, verify byte-for-byte, then remove the old
             migrate_workspace(current, str(ws))
         else:
-            for child in ("templates", "artifacts", "Memory"):
+            for child in ("templates", "artifacts", "memory"):
                 (ws / child).mkdir(parents=True, exist_ok=True)
         config.save_workspace(str(ws))
 
