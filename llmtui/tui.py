@@ -82,6 +82,7 @@ COMMANDS: list[tuple[str, str]] = [
     ("load", "resume a conversation"),
     ("model", "switch model"),
     ("delete", "remove conversations, this one included"),
+    ("settings", "edit the workspace path"),
 ]
 
 
@@ -691,20 +692,27 @@ class StatusBar(Static):
 
 
 class NamePrompt(ModalScreen[str | None]):
-    """Type a title for the current conversation."""
+    """Type a short string: a conversation title, or a settings value."""
 
     BINDINGS = [("escape", "cancel", "cancel")]
 
+    def __init__(self, label: str = "name this conversation", value: str = "") -> None:
+        super().__init__()
+        self._label = label
+        self._value = value
+
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Static("name this conversation", classes="modal-title"),
-            Input(placeholder="title", id="title"),
+            Static(self._label, classes="modal-title"),
+            Input(value=self._value, placeholder=self._label, id="title"),
             Static("enter save · esc cancel", classes="modal-hint"),
             classes="modal",
         )
 
     def on_mount(self) -> None:
         self.query_one("#title", Input).focus()
+        # cursor at the end so a prefilled value is instantly editable
+        self.query_one("#title", Input).cursor_position = len(self._value)
 
     @on(Input.Submitted, "#title")
     def save(self, event: Input.Submitted) -> None:
@@ -1357,6 +1365,22 @@ class LlmTui(App):
                     )
                 else:
                     await self._note(f"deleted {len(doomed)} session(s)")
+
+        elif command == "settings":
+            from llmtui import config
+
+            path = await self.push_screen_wait(
+                NamePrompt(
+                    "workspace path (templates, artifacts, Memory)",
+                    value=config.WORKSPACE_DIR or "",
+                )
+            )
+            if path:
+                ws = Path(path).expanduser().resolve()
+                for child in ("templates", "artifacts", "Memory"):
+                    (ws / child).mkdir(parents=True, exist_ok=True)
+                config.save_workspace(str(ws))
+                await self._note(f"workspace set to {ws}")
 
         else:
             await self._note(f"{command} unrecognized. Try /help.", failed=True)
