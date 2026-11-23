@@ -82,6 +82,7 @@ COMMANDS: list[tuple[str, str]] = [
     ("load", "resume a conversation"),
     ("model", "switch model"),
     ("delete", "remove conversations, this one included"),
+    ("settings", "edit settings, the workspace included"),
 ]
 
 
@@ -691,20 +692,27 @@ class StatusBar(Static):
 
 
 class NamePrompt(ModalScreen[str | None]):
-    """Type a title for the current conversation."""
+    """Type a short string: a conversation title, or a settings value."""
 
     BINDINGS = [("escape", "cancel", "cancel")]
 
+    def __init__(self, label: str = "name this conversation", value: str = "") -> None:
+        super().__init__()
+        self._label = label
+        self._value = value
+
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Static("name this conversation", classes="modal-title"),
-            Input(placeholder="title", id="title"),
+            Static(self._label, classes="modal-title"),
+            Input(value=self._value, placeholder=self._label, id="title"),
             Static("enter save · esc cancel", classes="modal-hint"),
             classes="modal",
         )
 
     def on_mount(self) -> None:
         self.query_one("#title", Input).focus()
+        # cursor at the end so a prefilled value is instantly editable
+        self.query_one("#title", Input).cursor_position = len(self._value)
 
     @on(Input.Submitted, "#title")
     def save(self, event: Input.Submitted) -> None:
@@ -742,6 +750,102 @@ class SessionPicker(ModalScreen[str | None]):
     @on(OptionList.OptionSelected, "#picker")
     def chosen(self, event: OptionList.OptionSelected) -> None:
         self.dismiss(self.sessions[event.option_index][0])
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class SettingsScreen(ModalScreen[None]):
+    """Editable settings: setting on the left, value on the right, one row
+    each. Enter opens an editor for the selected row; esc closes the screen.
+
+    Each setting carries a "kind" that picks the edit interface:
+
+    - "path" / "string": a text modal prefilled with the current value;
+      enter commits, esc cancels. Paths additionally get their directory
+      side effects (skeleton folders) from their setter.
+    - "choice": no edit modal — enter cycles to the next option in the
+      setting's option list, wrapping around. No choice-kind setting exists
+      yet; add one by appending ("key", kind="choice", options=[...]) to
+      the registry below and cycling in `chosen` when the kind matches.
+    """
+
+    BINDINGS = [("escape", "cancel", "cancel")]
+
+    def __init__(self) -> None:
+        super().__init__()
+        # the registry: (key, label, kind, getter, setter). one row per entry;
+        # a setter takes the committed string and applies + persists it
+        self.entries = [
+            (
+                "workspace",
+                "workspace",
+                "path",
+                lambda: config.WORKSPACE_DIR or "(not set)",
+                self._set_workspace,
+            ),
+        ]
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Static("settings", classes="modal-title"),
+            OptionList(id="settings"),
+            Static("", id="settings-error"),
+            Static("enter edit · esc close", classes="modal-hint"),
+            classes="modal",
+        )
+
+    def on_mount(self) -> None:
+        self._refresh()
+        self.query_one("#settings", OptionList).focus()
+
+    def _refresh(self) -> None:
+        ol = self.query_one("#settings", OptionList)
+        width = max(len(label) for _, label, *_ in self.entries)
+        ol.clear_options()
+        for _, label, kind, getter, _ in self.entries:
+            ol.add_option(f"{label:<{width}}  ·  {getter()} [{kind}]")
+        # highlight the first row so enter works without an arrow-key ritual
+        if ol.option_count:
+            ol.action_first()
+
+    @on(OptionList.OptionSelected, "#settings")
+    async def chosen(self, event: OptionList.OptionSelected) -> None:
+        key, _, kind, getter, setter = self.entries[event.option_index]
+        if kind == "choice":
+            # documented but unexercised: cycle the setting's option list
+            return
+
+        def edited(new: str | None) -> None:
+            if not new:
+                return
+            try:
+                setter(new)
+            except RuntimeError as error:
+                # the setter guarantees the old state is intact on failure
+                self.query_one("#settings-error", Static).update(f"✕ {error}")
+                return
+            self._refresh()
+
+        # callback, not push_screen_wait: this handler is a plain message
+        # callback, and waiting on a screen needs a worker (see LlmTui)
+        self.app.push_screen(
+            NamePrompt(key, value="" if getter().startswith("(") else getter()),
+            edited,
+        )
+
+    def _set_workspace(self, raw: str) -> None:
+        from llmtui.workspace import WORKSPACE_DIRS, migrate_workspace
+
+        ws = Path(raw).expanduser().resolve()
+        current = config.WORKSPACE_DIR
+        if current and Path(current).is_dir() and Path(current).resolve() != ws:
+            # full migration: copy, verify byte-for-byte, then remove the old
+            migrate_workspace(current, str(ws))
+        else:
+            for child in WORKSPACE_DIRS:
+                (ws / child).mkdir(parents=True, exist_ok=True)
+        config.save_workspace(str(ws))
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -922,10 +1026,21 @@ class LlmTui(App):
         self.status.context_window = await self.context_window()
         self.status.refresh_line()
         self.query_one("#prompt", PromptArea).focus()
+        # daily update check (issue #38): off-thread, silent on any failure
+        self.run_worker(self._update_check, exclusive=True)
         # anchoring is Textual's own: the container follows new content and lets
         # go the moment the reader scrolls, by whatever means. re-anchored below
         # whenever something new is deliberately put on screen
         self.transcript.anchor()
+
+    async def _update_check(self) -> None:
+        """Daily version check, run off-thread so it can never block the TUI."""
+
+        from llmtui.updates import check_for_update
+
+        hint = await asyncio.get_running_loop().run_in_executor(None, check_for_update)
+        if hint:
+            await self.note(hint)
 
     @on(PromptArea.Changed, "#prompt")
     def prompt_changed(self) -> None:
@@ -1346,6 +1461,9 @@ class LlmTui(App):
                     )
                 else:
                     await self._note(f"deleted {len(doomed)} session(s)")
+
+        elif command == "settings":
+            await self.push_screen_wait(SettingsScreen())
 
         else:
             await self._note(f"{command} unrecognized. Try /help.", failed=True)

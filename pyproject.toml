@@ -16,13 +16,22 @@ dependencies = [
     "pymupdf==1.28.2",
     "tqdm==4.70.0",
     "textual==8.2.8",
+    "platformdirs==4.13.3",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai==1.7.2",
 ]
 
-[tool.uv]
-# Flat layout: app.py / scripts/ are run directly, nothing to build or install.
-package = false
+[project.scripts]
+gm = "llmtui.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# flat layout: only the import package ships; scripts/ and tests/ stay dev-only.
+# prompts/ lives inside the package so importlib.resources finds it installed or in-repo
+[tool.hatch.build.targets.wheel]
+packages = ["llmtui"]
 
 [dependency-groups]
 dev = ["ruff==0.17.1", "mdformat==1.0.0"]

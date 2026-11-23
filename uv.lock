@@ -1218,7 +1218,7 @@ wheels = [
 [[package]]
 name = "llmtui"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "grandalf" },
     { name = "langchain" },
@@ -1230,6 +1230,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "milvus-lite" },
+    { name = "platformdirs" },
     { name = "pymilvus" },
     { name = "pymupdf" },
     { name = "textual" },
@@ -1254,6 +1255,7 @@ requires-dist = [
     { name = "langgraph", specifier = "==1.2.14" },
     { name = "langgraph-checkpoint-sqlite", specifier = "==3.1.2" },
     { name = "milvus-lite", specifier = "==3.2.0" },
+    { name = "platformdirs", specifier = "==4.13.3" },
     { name = "pymilvus", specifier = "==3.0.1" },
     { name = "pymupdf", specifier = "==1.28.2" },
     { name = "textual", specifier = "==8.2.8" },
