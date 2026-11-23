@@ -70,32 +70,44 @@ async def main_async() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="gm", description="the gm assistant")
+    class Parser(argparse.ArgumentParser):
+        def error(self, message):
+            # unknown words and bad flags get the full command list, not a
+            # bare usage line
+            self.print_help()
+            print(f"\ngm: error: {message}")
+            raise SystemExit(2)
+
+    parser = Parser(prog="gm", description="the gm assistant")
     parser.add_argument(
         "--version", action="store_true", help="print the installed version and exit"
     )
-    parser.add_argument(
-        "update",
-        nargs="?",
-        choices=["update"],
-        help="update gm to the latest tagged release",
-    )
-    parser.add_argument(
+
+    # tight subcommands: anything not listed is rejected, and rejection prints
+    # the full help (see Parser.error below)
+    sub = parser.add_subparsers(dest="command")
+    updater = sub.add_parser("update", help="update gm to the latest tagged release")
+    updater.add_argument(
         "-n",
         "--nightly",
         action="store_true",
-        help="with `update`: grab the latest commit on main instead of the latest tag",
+        help="grab the latest commit on main instead of the latest tag",
     )
+    sub.add_parser("help", help="show all commands and their flags")
+
     args = parser.parse_args()
     if args.version:
         from llmtui.updates import installed_version
 
         print(f"gm {installed_version()}")
         return
-    if args.update:
+    if args.command == "update":
         from llmtui.updates import update
 
         raise SystemExit(update(nightly=args.nightly))
+    if args.command == "help":
+        parser.print_help()
+        return
     asyncio.run(main_async())
 
 
