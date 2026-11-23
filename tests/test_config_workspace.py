@@ -278,4 +278,4 @@ def test_gm_update_nightly_grabs_main(cfg, monkeypatch):
 
     monkeypatch.setattr(u.subprocess, "run", fake_run)
     assert u.update(nightly=True) == 0
-    assert "@main" in ran["cmd"]
+    assert any("@main" in a for a in ran["cmd"])

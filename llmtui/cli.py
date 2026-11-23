@@ -78,6 +78,7 @@ def main() -> None:
         "update", nargs="?", help="update gm to the latest tagged release"
     )
     parser.add_argument(
+        "-n",
         "--nightly",
         action="store_true",
         help="with `update`: grab the latest commit on main instead of the latest tag",
