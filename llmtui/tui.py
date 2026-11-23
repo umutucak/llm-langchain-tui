@@ -82,7 +82,7 @@ COMMANDS: list[tuple[str, str]] = [
     ("load", "resume a conversation"),
     ("model", "switch model"),
     ("delete", "remove conversations, this one included"),
-    ("settings", "edit the workspace path"),
+    ("settings", "edit settings, the workspace included"),
 ]
 
 
@@ -755,6 +755,88 @@ class SessionPicker(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class SettingsScreen(ModalScreen[None]):
+    """Editable settings: setting on the left, value on the right, one row
+    each. Enter opens an editor for the selected row; esc closes the screen.
+
+    Each setting carries a "kind" that picks the edit interface:
+
+    - "path" / "string": a text modal prefilled with the current value;
+      enter commits, esc cancels. Paths additionally get their directory
+      side effects (skeleton folders) from their setter.
+    - "choice": no edit modal — enter cycles to the next option in the
+      setting's option list, wrapping around. No choice-kind setting exists
+      yet; add one by appending ("key", kind="choice", options=[...]) to
+      the registry below and cycling in `chosen` when the kind matches.
+    """
+
+    BINDINGS = [("escape", "cancel", "cancel")]
+
+    def __init__(self) -> None:
+        super().__init__()
+        # the registry: (key, label, kind, getter, setter). one row per entry;
+        # a setter takes the committed string and applies + persists it
+        self.entries = [
+            (
+                "workspace",
+                "workspace",
+                "path",
+                lambda: config.WORKSPACE_DIR or "(not set)",
+                self._set_workspace,
+            ),
+        ]
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Static("settings", classes="modal-title"),
+            OptionList(id="settings"),
+            Static("enter edit · esc close", classes="modal-hint"),
+            classes="modal",
+        )
+
+    def on_mount(self) -> None:
+        self._refresh()
+        self.query_one("#settings", OptionList).focus()
+
+    def _refresh(self) -> None:
+        ol = self.query_one("#settings", OptionList)
+        width = max(len(label) for _, label, *_ in self.entries)
+        ol.clear_options()
+        for _, label, kind, getter, _ in self.entries:
+            ol.add_option(f"{label:<{width}}  ·  {getter()} [{kind}]")
+        # highlight the first row so enter works without an arrow-key ritual
+        if ol.option_count:
+            ol.action_first()
+
+    @on(OptionList.OptionSelected, "#settings")
+    async def chosen(self, event: OptionList.OptionSelected) -> None:
+        key, _, kind, getter, setter = self.entries[event.option_index]
+        if kind == "choice":
+            # documented but unexercised: cycle the setting's option list
+            return
+
+        def edited(new: str | None) -> None:
+            if new:
+                setter(new)
+                self._refresh()
+
+        # callback, not push_screen_wait: this handler is a plain message
+        # callback, and waiting on a screen needs a worker (see LlmTui)
+        self.app.push_screen(
+            NamePrompt(key, value="" if getter().startswith("(") else getter()),
+            edited,
+        )
+
+    def _set_workspace(self, raw: str) -> None:
+        ws = Path(raw).expanduser().resolve()
+        for child in ("templates", "artifacts", "Memory"):
+            (ws / child).mkdir(parents=True, exist_ok=True)
+        config.save_workspace(str(ws))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class ModelPicker(ModalScreen[str | None]):
     """Pick a model. Returns its "provider/model" selector.
 
@@ -1367,20 +1449,7 @@ class LlmTui(App):
                     await self._note(f"deleted {len(doomed)} session(s)")
 
         elif command == "settings":
-            from llmtui import config
-
-            path = await self.push_screen_wait(
-                NamePrompt(
-                    "workspace path (templates, artifacts, Memory)",
-                    value=config.WORKSPACE_DIR or "",
-                )
-            )
-            if path:
-                ws = Path(path).expanduser().resolve()
-                for child in ("templates", "artifacts", "Memory"):
-                    (ws / child).mkdir(parents=True, exist_ok=True)
-                config.save_workspace(str(ws))
-                await self._note(f"workspace set to {ws}")
+            await self.push_screen_wait(SettingsScreen())
 
         else:
             await self._note(f"{command} unrecognized. Try /help.", failed=True)

@@ -128,6 +128,23 @@ once a day, with the last-check timestamp cached in the config dir. On timeout o
 failure it stays silent. A newer version prints a one-line hint above the chat:
 `new version available — run gm update`.
 
+### The `/settings` screen
+
+`/settings` in the TUI opens an editable list: setting key on the left, value on the
+right, one row per setting. Enter opens an editor for the selected row; esc closes the
+screen. Each setting carries a **kind** that picks the edit interface:
+
+- `path` / `string` — a text modal prefilled with the current value; enter commits,
+  esc cancels. A path's directory side effects (skeleton folders) live in its setter.
+- `choice` — no edit modal; enter cycles to the next option in the setting's option
+  list, wrapping around. No choice-kind setting exists yet; the first one to need it
+  implements the cycling in `SettingsScreen.chosen`.
+
+The registry lives in `SettingsScreen.__init__`; a setting is
+`(key, label, kind, getter, setter)` and a setter applies **and persists**. New
+settings are one registry row each — the screen itself never changes. Only the
+workspace setting exists today.
+
 ## First boot: the workspace
 
 On startup, before the TUI renders, `main()` checks config for `workspace` (an absolute

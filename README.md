@@ -82,7 +82,8 @@ uv run python scripts/inspect_context.py    # dump a thread's context as html
 ```
 
 slash commands in the TUI: `/help`, `/model`, `/name`, `/load`, `/new`, `/delete`,
-`/settings` (edit the workspace path).
+`/settings` (settings list — keys on the left, values on the right; enter edits the
+selected one).
 
 ## rag / ingest
 
