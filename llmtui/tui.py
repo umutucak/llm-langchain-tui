@@ -1033,6 +1033,11 @@ class LlmTui(App):
         # whenever something new is deliberately put on screen
         self.transcript.anchor()
 
+    async def note(self, text: str, classes: str = "note") -> None:
+        """A standalone line in the transcript (update hints, etc.)."""
+
+        await self.transcript.mount(Static(text, classes=classes, markup=False))
+
     async def _update_check(self) -> None:
         """Daily version check, run off-thread so it can never block the TUI."""
 
