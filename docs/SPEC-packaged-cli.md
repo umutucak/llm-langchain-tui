@@ -53,8 +53,8 @@ diff. `main()` moves to `llmtui/cli.py`, unchanged in body.
 
 The user never interacts with `uv`. The one-time `curl … | sh` installer ensures `uv`
 exists (installing it non-interactively if not) and then installs from the latest tag;
-every later update is `gm update`, which shells out to `uv` behind the scenes. The
-curl installer is a small follow-up after this issue.
+every later update is `gm update`, which shells out to `uv` behind the scenes. The curl
+installer is a small follow-up after this issue.
 
 ### Install and update
 
@@ -79,20 +79,19 @@ optional override path in the config dir that wins over the packaged default.
 
 `llmtui/config.py` switches from `PROJECT_ROOT`-relative resolution to `platformdirs`:
 
-| constant | today | after |
-|---|---|---|
-| config.json, models.json | `PROJECT_ROOT/config/` | root dir |
-| sqlite, milvus, backups | `PROJECT_ROOT/db/` | root dir, `db/` subdir |
-| system prompt | `PROJECT_ROOT/prompts/` | packaged default, overridable from config dir |
-| pdf library | config key, repo-relative | config key, absolute or `~`-relative |
-| artifacts, templates, Memory | — (new in #37) | workspace (below) |
+| constant | today | after | |---|---|---| | config.json, models.json |
+`PROJECT_ROOT/config/` | root dir | | sqlite, milvus, backups | `PROJECT_ROOT/db/` |
+root dir, `db/` subdir | | system prompt | `PROJECT_ROOT/prompts/` | packaged default,
+overridable from config dir | | pdf library | config key, repo-relative | config key,
+absolute or `~`-relative | | artifacts, templates, Memory | — (new in #37) | workspace
+(below) |
 
 - One root directory holds everything, config and data alike: `~/.config/llmtui/` on
-Linux **and** macOS, `%APPDATA%\llmtui\` on Windows. No separate data dir — on macOS
-`user_config_dir` and `user_data_dir` are the same path anyway, and a single root is
-one place to explain, back up and delete. The root is hand-rolled (three lines) rather
-than platformdirs, because platformdirs picks the macOS Library dir and we want the
-XDG path on both Unix platforms. The layout inside the root:
+  Linux **and** macOS, `%APPDATA%\llmtui\` on Windows. No separate data dir — on macOS
+  `user_config_dir` and `user_data_dir` are the same path anyway, and a single root is
+  one place to explain, back up and delete. The root is hand-rolled (three lines) rather
+  than platformdirs, because platformdirs picks the macOS Library dir and we want the
+  XDG path on both Unix platforms. The layout inside the root:
 
 ```text
 ~/.config/llmtui/
@@ -106,6 +105,7 @@ three platforms).
 
 The workspace (below) holds everything the agent produces and is the only user-visible
 content directory.
+
 - Existing keys, validation behaviour (fail at import, offending key named) and the
   `LLMTUI_CONFIG` env override are unchanged — only the base directory moves.
 - `models.json` sits next to `config.json` in the config dir; the README's setup step
@@ -117,10 +117,10 @@ content directory.
 
 ### Updates
 
-Release channel is **git tags**. `gm update` shells out to `uv tool install --reinstall
+Release channel is **git tags**. `gm update` shells out to \`uv tool install --reinstall
 
-git+https://github.com/umutucak/llm-langchain-tui.git@<latest-tag>`; `gm --version`
-prints `importlib.metadata.version("llmtui")`.
+git+https://github.com/umutucak/llm-langchain-tui.git@<latest-tag>`; `gm
+--version`prints`importlib.metadata.version("llmtui")\`.
 
 At startup (TUI path only, not the utility subcommands) a background thread hits the
 GitHub API for the latest tag and compares it against the installed version — at most
@@ -134,16 +134,19 @@ failure it stays silent. A newer version prints a one-line hint above the chat:
 right, one row per setting. Enter opens an editor for the selected row; esc closes the
 screen. Each setting carries a **kind** that picks the edit interface:
 
-- `path` / `string` — a text modal prefilled with the current value; enter commits,
-  esc cancels. A path's directory side effects (skeleton folders) live in its setter.
+- `path` / `string` — a text modal prefilled with the current value; enter commits, esc
+  cancels. A path setter's side effects: the workspace setter **migrates** — copy the
+  old workspace to the new place, verify every file byte-for-byte, only then remove the
+  old directory; on any failure the copy is rolled back, the old state is untouched, and
+  the error is shown in the screen (`migrate_workspace` in `llmtui/workspace.py`).
 - `choice` — no edit modal; enter cycles to the next option in the setting's option
   list, wrapping around. No choice-kind setting exists yet; the first one to need it
   implements the cycling in `SettingsScreen.chosen`.
 
 The registry lives in `SettingsScreen.__init__`; a setting is
-`(key, label, kind, getter, setter)` and a setter applies **and persists**. New
-settings are one registry row each — the screen itself never changes. Only the
-workspace setting exists today.
+`(key, label, kind, getter, setter)` and a setter applies **and persists**. New settings
+are one registry row each — the screen itself never changes. Only the workspace setting
+exists today.
 
 ## First boot: the workspace
 
@@ -165,10 +168,10 @@ The workspace path is exported as `llmtui.config.WORKSPACE_DIR` and is the singl
 
 ## Threads and checkpoints
 
-One sqlite file in the root's `db/` dir, one milvus db beside it — not per-directory. Threads
-are already uuid-keyed (`agent_thread_config`); `/load` lists them as it does today.
-Per-campaign separation is deliberately deferred: if it is wanted, it becomes a label on
-threads, not a directory layout.
+One sqlite file in the root's `db/` dir, one milvus db beside it — not per-directory.
+Threads are already uuid-keyed (`agent_thread_config`); `/load` lists them as it does
+today. Per-campaign separation is deliberately deferred: if it is wanted, it becomes a
+label on threads, not a directory layout.
 
 ## Testing
 

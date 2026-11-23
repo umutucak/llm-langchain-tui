@@ -790,6 +790,7 @@ class SettingsScreen(ModalScreen[None]):
         yield Vertical(
             Static("settings", classes="modal-title"),
             OptionList(id="settings"),
+            Static("", id="settings-error"),
             Static("enter edit · esc close", classes="modal-hint"),
             classes="modal",
         )
@@ -816,9 +817,15 @@ class SettingsScreen(ModalScreen[None]):
             return
 
         def edited(new: str | None) -> None:
-            if new:
+            if not new:
+                return
+            try:
                 setter(new)
-                self._refresh()
+            except RuntimeError as error:
+                # the setter guarantees the old state is intact on failure
+                self.query_one("#settings-error", Static).update(f"✕ {error}")
+                return
+            self._refresh()
 
         # callback, not push_screen_wait: this handler is a plain message
         # callback, and waiting on a screen needs a worker (see LlmTui)
@@ -828,9 +835,16 @@ class SettingsScreen(ModalScreen[None]):
         )
 
     def _set_workspace(self, raw: str) -> None:
+        from llmtui.workspace import migrate_workspace
+
         ws = Path(raw).expanduser().resolve()
-        for child in ("templates", "artifacts", "Memory"):
-            (ws / child).mkdir(parents=True, exist_ok=True)
+        current = config.WORKSPACE_DIR
+        if current and Path(current).is_dir() and Path(current).resolve() != ws:
+            # full migration: copy, verify byte-for-byte, then remove the old
+            migrate_workspace(current, str(ws))
+        else:
+            for child in ("templates", "artifacts", "Memory"):
+                (ws / child).mkdir(parents=True, exist_ok=True)
         config.save_workspace(str(ws))
 
     def action_cancel(self) -> None:

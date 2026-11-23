@@ -142,6 +142,76 @@ def test_ensure_workspace_empty_dir_is_valid(cfg, config_env, monkeypatch):
     assert asyncio.run(w.ensure_workspace()) == str(ws)
 
 
+# ---------- workspace migration ----------
+
+
+def _make_ws(root: Path) -> Path:
+    ws = root / "ws"
+    for child in ("templates", "artifacts", "Memory/deep"):
+        (ws / child).mkdir(parents=True)
+    (ws / "Memory/notes.md").write_text("hello dmg")
+    (ws / "Memory/deep/nested.bin").write_bytes(os.urandom(4096))
+    return ws
+
+
+def test_migrate_happy_path_then_old_removed(cfg, tmp_path):
+    import llmtui.workspace as w
+
+    src = _make_ws(tmp_path)
+    payload = (src / "Memory/deep/nested.bin").read_bytes()
+    dst = tmp_path / "elsewhere"
+
+    w.migrate_workspace(str(src), str(dst))
+
+    assert not src.exists()
+    assert (dst / "Memory/notes.md").read_text() == "hello dmg"
+    assert (dst / "Memory/deep/nested.bin").read_bytes() == payload
+
+
+def test_migrate_refuses_nonempty_target_and_nesting(cfg, tmp_path):
+    import llmtui.workspace as w
+
+    src = _make_ws(tmp_path)
+    busy = tmp_path / "busy"
+    busy.mkdir()
+    (busy / "user-file.txt").write_text("precious")
+    with pytest.raises(RuntimeError, match="not empty"):
+        w.migrate_workspace(str(src), str(busy))
+    assert (busy / "user-file.txt").read_text() == "precious"
+    assert src.exists()
+
+    with pytest.raises(RuntimeError, match="nests inside"):
+        w.migrate_workspace(str(src), str(src / "sub"))
+
+
+def test_migrate_rolls_back_on_verification_failure(cfg, tmp_path, monkeypatch):
+    import llmtui.workspace as w
+
+    src = _make_ws(tmp_path)
+    dst = tmp_path / "elsewhere"
+    monkeypatch.setattr(w.filecmp, "cmp", lambda *a, **k: False)
+
+    with pytest.raises(RuntimeError, match="cancelled, nothing changed"):
+        w.migrate_workspace(str(src), str(dst))
+
+    # pre-migration state restored: target gone, source untouched
+    assert not dst.exists()
+    assert src.exists()
+    assert (src / "Memory/notes.md").read_text() == "hello dmg"
+
+
+def test_migrate_into_empty_existing_target(cfg, tmp_path):
+    import llmtui.workspace as w
+
+    src = _make_ws(tmp_path)
+    dst = tmp_path / "empty"
+    dst.mkdir()
+    w.migrate_workspace(str(src), str(dst))
+    assert not src.exists()
+    assert dst.exists()
+    assert (dst / "Memory/notes.md").read_text() == "hello dmg"
+
+
 # ---------- updates ----------
 
 
