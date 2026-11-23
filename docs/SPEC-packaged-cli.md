@@ -117,10 +117,10 @@ content directory.
 
 ### Updates
 
-Release channel is **git tags**. `gm update` shells out to \`uv tool install --reinstall
-
-git+https://github.com/umutucak/llm-langchain-tui.git@<latest-tag>`; `gm
---version`prints`importlib.metadata.version("llmtui")\`.
+Release channel is **git tags**. `gm update` shells out to
+`uv tool install --reinstall git+https://github.com/umutucak/llm-langchain-tui.git@<latest-tag>`;
+`gm update --nightly` grabs the latest commit on main the same way (`@main`), for
+testing unreleased work. `gm --version` prints `importlib.metadata.version("llmtui")`.
 
 At startup (TUI path only, not the utility subcommands) a background thread hits the
 GitHub API for the latest tag and compares it against the installed version — at most

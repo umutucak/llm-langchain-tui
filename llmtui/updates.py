@@ -79,18 +79,24 @@ def check_for_update() -> str | None:
     return None
 
 
-def update() -> int:
-    """`gm update`: reinstall from the latest tag. Returns an exit code."""
+def update(nightly: bool = False) -> int:
+    """`gm update`: reinstall from the latest tag; with --nightly, from the
+    latest commit on main. Returns an exit code."""
 
-    status, tag = latest_tag()
-    if tag is None:
-        print(
-            "gm update: no tagged release found on GitHub"
-            if status == "empty"
-            else "gm update: could not reach GitHub to find the latest version"
-        )
-        return 1
-    print(f"updating gm to {tag} ...")
+    if nightly:
+        print("updating gm to the latest commit on main ...")
+        ref = "main"
+    else:
+        status, tag = latest_tag()
+        if tag is None:
+            print(
+                "gm update: no tagged release found on GitHub"
+                if status == "empty"
+                else "gm update: could not reach GitHub to find the latest version"
+            )
+            return 1
+        print(f"updating gm to {tag} ...")
+        ref = tag
     try:
         return subprocess.run(
             [
@@ -98,7 +104,7 @@ def update() -> int:
                 "tool",
                 "install",
                 "--reinstall",
-                f"git+https://github.com/{REPO}.git@{tag}",
+                f"git+https://github.com/{REPO}.git@{ref}",
             ],
             check=False,
         ).returncode

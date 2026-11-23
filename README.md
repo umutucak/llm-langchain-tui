@@ -15,6 +15,7 @@ uv sync                    # creates .venv, installs the pinned deps
 uv tool install .          # from the repo; puts `gm` on the PATH
 gm                         # the chat TUI, from any directory
 gm update                  # update to the latest tagged release
+gm update --nightly        # update to the latest commit on main
 gm --version
 ```
 

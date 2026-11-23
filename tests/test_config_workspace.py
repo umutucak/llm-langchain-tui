@@ -265,3 +265,17 @@ def test_gm_update_shells_out_to_uv(cfg, monkeypatch):
     assert u.update() == 0
     assert "git+https://github.com/umutucak/llm-langchain-tui.git@v0.2.0" in ran["cmd"]
     assert "--reinstall" in ran["cmd"]
+
+
+def test_gm_update_nightly_grabs_main(cfg, monkeypatch):
+    import llmtui.updates as u
+
+    ran = {}
+
+    def fake_run(cmd, **kwargs):
+        ran["cmd"] = cmd
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(u.subprocess, "run", fake_run)
+    assert u.update(nightly=True) == 0
+    assert "@main" in ran["cmd"]

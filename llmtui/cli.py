@@ -77,6 +77,11 @@ def main() -> None:
     parser.add_argument(
         "update", nargs="?", help="update gm to the latest tagged release"
     )
+    parser.add_argument(
+        "--nightly",
+        action="store_true",
+        help="with `update`: grab the latest commit on main instead of the latest tag",
+    )
     args = parser.parse_args()
     if args.version:
         from llmtui.updates import installed_version
@@ -86,7 +91,7 @@ def main() -> None:
     if args.update:
         from llmtui.updates import update
 
-        raise SystemExit(update())
+        raise SystemExit(update(nightly=args.nightly))
     asyncio.run(main_async())
 
 
