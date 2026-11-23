@@ -81,7 +81,8 @@ uv run python scripts/ingest.py <pdf_dir>   # build the vector store
 uv run python scripts/inspect_context.py    # dump a thread's context as html
 ```
 
-slash commands in the TUI: `/help`, `/model`, `/name`, `/load`, `/new`, `/delete`.
+slash commands in the TUI: `/help`, `/model`, `/name`, `/load`, `/new`, `/delete`,
+`/settings` (edit the workspace path).
 
 ## rag / ingest
 
